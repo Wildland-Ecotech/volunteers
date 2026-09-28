@@ -85,13 +85,32 @@ button,input,select{font:inherit;color:inherit}
 .digest{display:none;flex-direction:column;gap:3px;margin:10px 0 12px;font-size:15px}
 .digest .line{display:flex;flex-wrap:wrap;gap:2px 18px}
 .digest .muted{color:var(--muted)}
+.splitbar{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin:12px 0 0}
+.splitbar .hint{font-size:14px}
+.btn.small.on{background:var(--mark-soft);border-color:var(--mark)}
+.tl.splitting{cursor:crosshair}
+.tlover{position:absolute;inset:0;pointer-events:none}
+.tl .gap{position:absolute;top:2px;height:32px;background:repeating-linear-gradient(135deg,var(--line) 0 4px,transparent 4px 9px)}
+.tl .guide{position:absolute;top:-2px;height:38px;width:2px;margin-left:-1px;background:var(--ink)}
+.tl .guide span,.tl .split span{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:3px;font-size:12px;font-weight:700;background:var(--ink);color:var(--surface);padding:1px 6px;border-radius:4px;white-space:nowrap}
+.tl .split{position:absolute;top:-2px;height:38px;width:12px;margin-left:-6px;pointer-events:auto;cursor:ew-resize;touch-action:none}
+.tl .split::before{content:"";position:absolute;left:5px;top:0;bottom:0;width:3px;background:var(--ink);border-radius:2px}
+.tl .split button{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;border:2px solid var(--surface);background:var(--ink);color:var(--surface);font:700 13px/1 var(--body);padding:0;cursor:pointer}
+.tl .split button:focus-visible{outline:3px solid var(--mark);outline-offset:1px}
+.gdiv{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--muted);margin:4px 0}
+.gdiv::before,.gdiv::after{content:"";flex:1;border-top:2px dashed var(--line)}
+.group+.group{border-top:2px dashed var(--line);margin-top:20px}
+.gtitle{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:16px 0 4px}
+.gtitle h3{font-family:var(--display);font-size:18px;margin:0}
+.gtitle .range{color:var(--muted);font-size:14px}
+.digest .glabel{color:var(--muted);font-weight:700}
 .adj{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-start;margin:16px 0 4px}
 .adjtitle{flex:1 1 100%;margin:0;font-size:13px;font-weight:700;color:var(--muted)}
 .adj .field input.mins{width:6em;font-weight:700}
 .unit{align-self:center;color:var(--muted);font-size:14px}
 .day.reviewed{padding:14px 22px;margin:10px 0}
 .day.reviewed h2{font-size:20px}
-.day.reviewed .tl,.day.reviewed .fields,.day.reviewed .adj,.day.reviewed .vol,.day.reviewed .dayactions{display:none}
+.day.reviewed .tl,.day.reviewed .splitbar,.day.reviewed .groups,.day.reviewed .dayactions{display:none}
 .day.reviewed .digest{display:flex}
 .day.reviewed .tile:not(.on){display:none}
 .day.reviewed .grid{grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
@@ -102,7 +121,7 @@ button,input,select{font:inherit;color:inherit}
 .day.reviewed.empty h2{font-size:16px;font-weight:600;color:var(--muted)}
 .day.reviewed.empty .meta{font-size:13px}
 .dayhead .meta{color:var(--muted);font-size:15px}
-.tl{position:relative;height:56px;margin:14px 0 18px}
+.tl{position:relative;height:56px;margin:26px 0 18px;touch-action:none}
 .tl .axis{position:absolute;left:0;right:0;top:34px;border-top:1px solid var(--line)}
 .tl .band{position:absolute;top:2px;height:32px;background:var(--mark-soft);border-left:3px solid var(--mark);border-right:3px solid var(--mark);min-width:3px}
 .tl .tick{position:absolute;top:12px;width:2px;height:22px;margin-left:-1px;background:var(--accent);border-radius:1px}
@@ -605,35 +624,56 @@ const photoKey = p => `${p.name}|${p.file.size}`;
 state.round = 0;
 let saveTimer = 0, serverTimer = 0;
 
-/* Saved data, version 3
+/* Saved data, version 4
    selected   keys ("file name|size") of selected photos, including duplicate copies
    photoInfo  per selected photo: t = time taken (local), p = path, c = key of the
               original when this file is a duplicate copy
-   days       per date: names, count (null = count the names), notes, reviewed,
-              adjust (minutes: before first photo, after last photo, travel),
-              and calc, the photo-based times, written for your records only. */
+   days       per date: reviewed, splits (seconds after midnight, sorted), and
+              groups, one per part of the day: names, count (null = count the
+              names), notes, adjust (minutes: before first photo, after last
+              photo, travel). calc records the photo-based times of each group
+              for your records; it is recalculated, never read back. */
+const blankGroup = () => ({ names: [], count: null, notes: '', adjust: { before: 0, after: 0, travel: 0 } });
 const dayInfo = key => saved.days[key] || null;
-const ensureDay = key => saved.days[key] || (saved.days[key] = { names: [], count: null, notes: '', reviewed: false, adjust: { before: 0, after: 0, travel: 0 } });
+const ensureDay = key => saved.days[key] || (saved.days[key] = { reviewed: false, splits: [], groups: [blankGroup()] });
+const groupInfo = (key, gi) => { const d = dayInfo(key); return (d && d.groups[gi]) || null; };
+function ensureGroup(key, gi) { const d = ensureDay(key); while (d.groups.length <= gi) d.groups.push(blankGroup()); return d.groups[gi]; }
+const splitsOf = key => (dayInfo(key) || {}).splits || [];
+const secOfDay = d => d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+function groupIndex(splits, date) { const t = secOfDay(date); let i = 0; while (i < splits.length && t >= splits[i]) i++; return i; }
 const clampMin = v => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(-1440, Math.min(1440, n)) : 0; };
-function adjOf(key) {
-  const a = (dayInfo(key) || {}).adjust || {};
+function adjOf(key, gi) {
+  const a = (groupInfo(key, gi) || {}).adjust || {};
   return { before: clampMin(a.before || 0), after: clampMin(a.after || 0), travel: clampMin(a.travel || 0) };
 }
+function cleanGroup(v) {
+  v = v && typeof v === 'object' ? v : {};
+  const names = Array.isArray(v.names) ? v.names.filter(n => typeof n === 'string').map(n => n.trim()).filter(Boolean).slice(0, 500) : [];
+  const count = Number.isInteger(v.count) && v.count >= 0 ? v.count : null;
+  const notes = typeof v.notes === 'string' ? v.notes : '';
+  const a = v.adjust && typeof v.adjust === 'object' ? v.adjust : {};
+  return { names, count, notes, adjust: { before: clampMin(a.before || 0), after: clampMin(a.after || 0), travel: clampMin(a.travel || 0) } };
+}
+const hasContent = g => !!(g.names.length || g.count != null || g.notes.trim() || g.adjust.before || g.adjust.after || g.adjust.travel);
 function cleanDays(obj) {
   const out = {};
   if (!obj || typeof obj !== 'object') return out;
   for (const [k, v] of Object.entries(obj)) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || !v || typeof v !== 'object') continue;
-    const names = Array.isArray(v.names) ? v.names.filter(n => typeof n === 'string').map(n => n.trim()).filter(Boolean).slice(0, 500) : [];
-    const count = Number.isInteger(v.count) && v.count >= 0 ? v.count : null;
-    const notes = typeof v.notes === 'string' ? v.notes : '';
     const reviewed = v.reviewed === true;
-    const a = v.adjust && typeof v.adjust === 'object' ? v.adjust : {};
-    const adjust = { before: clampMin(a.before || 0), after: clampMin(a.after || 0), travel: clampMin(a.travel || 0) };
-    const hasAdj = adjust.before || adjust.after || adjust.travel;
-    if (names.length || count != null || notes.trim() || reviewed || hasAdj) out[k] = { names, count, notes, reviewed, adjust };
+    const splits = [...new Set((Array.isArray(v.splits) ? v.splits : []).map(Number)
+      .filter(n => Number.isInteger(n) && n > 0 && n < 86400))].sort((a, b) => a - b).slice(0, 20);
+    let groups = Array.isArray(v.groups) ? v.groups.map(cleanGroup) : [cleanGroup(v)];   // older data kept one group's fields on the day
+    while (groups.length < splits.length + 1) groups.push(blankGroup());
+    groups = groups.slice(0, splits.length + 1);
+    if (reviewed || splits.length || groups.some(hasContent)) out[k] = { reviewed, splits, groups };
   }
   return out;
+}
+function splitList(list, splits) {       // list of {t: Date}, sorted -> one array per group
+  const parts = Array.from({ length: splits.length + 1 }, () => []);
+  for (const x of list) parts[groupIndex(splits, x.t)].push(x);
+  return parts;
 }
 function recordInfo(p) {
   const main = p.dupOf;
@@ -661,12 +701,14 @@ function snapshot() {
   for (const k of saved.sel) { const i = saved.info.get(k); if (i) photoInfo[k] = i; }
   const days = cleanDays(saved.days);
   for (const [key, list] of savedPhotoDays().days) {
-    const s = list[0].t, e = list[list.length - 1].t;
-    const d = days[key] || (days[key] = { names: [], count: null, notes: '', reviewed: false, adjust: { before: 0, after: 0, travel: 0 } });
-    d.calc = { firstPhoto: isoLocal(s), lastPhoto: isoLocal(e), photoMinutes: Math.round((e - s) / 60000), photos: list.length };
+    const d = days[key] || (days[key] = { reviewed: false, splits: [], groups: [blankGroup()] });
+    d.calc = splitList(list, d.splits).map(g => g.length ? {
+      firstPhoto: isoLocal(g[0].t), lastPhoto: isoLocal(g[g.length - 1].t),
+      photoMinutes: Math.round((g[g.length - 1].t - g[0].t) / 60000), photos: g.length
+    } : null);
   }
   return {
-    app: 'volunteer-photo-hours', version: 3, savedAt: saved.savedAt || new Date().toISOString(),
+    app: 'volunteer-photo-hours', version: 4, savedAt: saved.savedAt || new Date().toISOString(),
     selected: [...saved.sel], photoInfo, days,
     settings: { format: state.format, order: state.order, round: state.round, onlySel: !!state.onlySel, from: $('#from').value, to: $('#to').value }
   };
@@ -1045,32 +1087,41 @@ function updateThumbStat() {
   }, 150);
 }
 
-/* ================= Days ================= */
+/* ================= Days =================
+   A day can be split into groups (parts of the day) at chosen times. Each
+   group has its own times, adjustments, volunteers and notes. */
 function roundTime(d) {
   if (!state.round) return d;
   const step = state.round * 60000;
   return new Date(Math.round(d.getTime() / step) * step);
 }
-// Photo-based times for a day, from the photos loaded right now
-function stats(day) {
-  let s = null, e = null, count = 0;
-  for (const p of day.photos) if (p.selected) { if (!s) s = p.date; e = p.date; count++; }
-  if (!count) return null;
-  return { s, e, count, rs: roundTime(s), re: roundTime(e) };
+// Photo-based times for each group of a day, from the photos loaded right now
+function groupStats(day, splits) {
+  splits = splits || splitsOf(day.key);
+  const out = Array.from({ length: splits.length + 1 }, () => null);
+  for (const p of day.photos) if (p.selected) {
+    const gi = groupIndex(splits, p.date);
+    const g = out[gi] || (out[gi] = { s: p.date, e: p.date, count: 0 });
+    g.e = p.date; g.count++;
+  }
+  for (const g of out) if (g) { g.rs = roundTime(g.s); g.re = roundTime(g.e); }
+  return out;
 }
-// Photo times plus this day's adjustments (minutes before, after, travel)
-function dayTotals(key, rs, re) {
-  const a = adjOf(key);
+// Photo times plus a group's adjustments (minutes before, after, travel)
+function dayTotals(key, gi, rs, re) {
+  const a = adjOf(key, gi);
   const start = new Date(rs.getTime() - a.before * 60000), end = new Date(re.getTime() + a.after * 60000);
   const photoMs = Math.max(0, re - rs);
   const ms = Math.max(0, Math.max(0, end - start) + a.travel * 60000);
   return { start, end, photoMs, ms, addMs: ms - photoMs, a };
 }
-const volCount = key => { const d = dayInfo(key); return d ? (d.count != null ? d.count : d.names.length) : 0; };
+const countOf = g => g ? (g.count != null ? g.count : g.names.length) : 0;
+const volCount = (key, gi) => countOf(groupInfo(key, gi));
 const numStr = x => String(Math.round(x * 100) / 100);
 const volHours = (ms, n) => ms / 3600000 * n;
 const hmSigned = ms => (ms < 0 ? '−' : '+') + hm(Math.abs(ms));
 const t12pad = d => { let hh = d.getHours(); const ap = hh < 12 ? 'AM' : 'PM'; hh = hh % 12 || 12; return `${pad(hh)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ap}`; };
+const secLabel = sec => t12(new Date(2000, 0, 1, Math.floor(sec / 3600), Math.floor(sec / 60) % 60, sec % 60));
 function parseNames(text) {
   const seen = new Set(), out = [];
   for (const raw of text.split(/[\n,]/)) {
@@ -1081,19 +1132,20 @@ function parseNames(text) {
 }
 function knownNames() {
   const freq = new Map();
-  for (const d of Object.values(saved.days)) for (const n of d.names) {
+  for (const d of Object.values(saved.days)) for (const g of d.groups) for (const n of g.names) {
     const k = n.toLowerCase(); const f = freq.get(k);
     if (f) f.n++; else freq.set(k, { name: n, n: 1 });
   }
   return [...freq.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name)).map(x => x.name);
 }
 
-// Your tracking sheet's columns. Start, End and Duration include adjustments.
+// Your tracking sheet's columns, one row per group. Start, End and Duration include adjustments.
 const LOG_HEAD = ['Date', 'Volunteers', '# of Volunteers', 'Start Time', 'End Time', 'Duration', 'Total Hours', 'Activities'];
-function logRow(key, st) {
-  const d = dayInfo(key), n = volCount(key), T = dayTotals(key, st.rs, st.re);
-  return [key, d ? d.names.join('\n') : '', n, t12pad(T.start), t12pad(T.end), numStr(T.ms / 3600000), numStr(volHours(T.ms, n)), d ? d.notes.trim() : ''];
+function logRow(key, gi, st) {
+  const g = groupInfo(key, gi), n = countOf(g), T = dayTotals(key, gi, st.rs, st.re);
+  return [key, g ? g.names.join('\n') : '', n, t12pad(T.start), t12pad(T.end), numStr(T.ms / 3600000), numStr(volHours(T.ms, n)), g ? g.notes.trim() : ''];
 }
+const dayRows = day => groupStats(day).map((st, gi) => st ? logRow(day.key, gi, st) : null).filter(Boolean);
 const tsvCell = v => { const t = String(v); return /[\t\n\r"]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
 const toTSV = rows => rows.map(r => r.map(tsvCell).join('\t')).join('\n');
 
@@ -1133,6 +1185,15 @@ function rebuild() {
   updateSummary();
 }
 
+// Re-render one day in place (after adding, moving or removing a split)
+function rerenderDay(day) {
+  for (const p of day.photos) { if (p.tileEl && io) io.unobserve(p.tileEl); hideThumb(p); p.tileEl = null; }
+  const old = day.els.sec;
+  day.els = {}; day.mode = null; day.hover = null; day.drag = null;
+  if (splitDay === day) splitDay = null;
+  old.replaceWith(renderDay(day));
+}
+
 function copyBtn(getText, label) {
   const b = h('button', { class: 'btn small', type: 'button' }, label || 'Copy');
   b.addEventListener('click', () => copyText(getText(), b));
@@ -1145,93 +1206,48 @@ function renderDay(day) {
   const uid = 'd' + day.key.replace(/-/g, '');
   const E = day.els;
   E.meta = h('span', { class: 'meta' });
-  E.tl = h('div', { class: 'tl', role: 'img' });
   E.digest = h('div', { class: 'digest' });
 
   // Reviewed: same spot on every day, at the left of the header
-  E.rev = h('button', { class: 'rev', type: 'button', 'aria-pressed': 'false' },
+  E.rev = h('button', { class: 'rev', type: 'button', 'aria-pressed': 'false', 'aria-label': `Reviewed, ${when}` },
     h('span', { class: 'box', 'aria-hidden': 'true' }), 'Reviewed');
-  E.rev.setAttribute('aria-label', `Reviewed, ${when}`);
   E.rev.addEventListener('click', () => {
     const d = ensureDay(day.key); d.reviewed = !d.reviewed;
     persist(); updateDay(day); updateSummary();
   });
 
-  const field = (label, cls) => {
-    const input = h('input', { readonly: true, placeholder: 'No photos selected', 'aria-label': `${label}, ${when}` });
-    input.addEventListener('focus', () => input.select());
-    const hmEl = h('span', { class: 'hm' });
-    return { wrap: h('div', { class: 'field ' + (cls || '') }, h('label', {}, label), h('div', { class: 'row' }, input, copyBtn(() => input.value)), hmEl), input, hmEl };
-  };
-  const fs = field('Start'), fe = field('End'), fh = field('Duration (hours)', 'hours');
-  E.start = fs.input; E.end = fe.input; E.hours = fh.input;
-  E.startHint = fs.hmEl; E.endHint = fe.hmEl; E.hm = fh.hmEl;
+  // Splitting: button, hint, and the timeline it acts on
+  E.addSplit = h('button', { class: 'btn small', type: 'button' }, 'Add split');
+  E.addSplit.addEventListener('click', () => setSplitMode(day, day.mode === 'add' ? null : 'add'));
+  E.splitHint = h('span', { class: 'hint', 'aria-live': 'polite' });
+  E.tl = h('div', { class: 'tl', role: 'img' });
+  wireTimeline(day);
 
-  // Time the photos don't show, in minutes
-  const a = adjOf(day.key);
-  const adjInput = (label, key, hint) => {
-    const input = h('input', { id: uid + key, class: 'mins', type: 'number', step: '5', min: '-1440', max: '1440', inputmode: 'numeric', placeholder: '0' });
-    input.value = a[key] ? String(a[key]) : '';
-    input.addEventListener('input', () => {
-      const d = ensureDay(day.key);
-      d.adjust = { ...adjOf(day.key), [key]: clampMin(input.value || 0) };
-      persist(); updateDay(day); updateSummary();
-    });
-    return h('div', { class: 'field' }, h('label', { for: uid + key }, label), h('div', { class: 'row' }, input, h('span', { class: 'unit' }, 'min')), h('span', { class: 'hint' }, hint));
-  };
-  const adj = h('div', { class: 'adj' },
-    h('p', { class: 'adjtitle' }, 'Time the photos don’t show'),
-    adjInput('Before first photo', 'before', 'Moves the start earlier'),
-    adjInput('After last photo', 'after', 'Moves the end later'),
-    adjInput('Travel', 'travel', 'Added to the duration'));
+  // One block of details per group
+  const splits = splitsOf(day.key);
+  E.groups = [];
+  const groupsBox = h('div', { class: 'groups' });
+  for (let gi = 0; gi <= splits.length; gi++) groupsBox.append(buildGroup(day, gi, uid, when));
 
-  // Volunteer details for this day
-  const info = dayInfo(day.key);
-  E.names = h('textarea', { id: uid + 'n', rows: '4', placeholder: 'One name per line', spellcheck: 'false' });
-  E.names.value = info ? info.names.join('\n') : '';
-  E.chips = h('div', { class: 'chips' });
-  E.count = h('input', { id: uid + 'c', class: 'count', type: 'number', min: '0', step: '1', inputmode: 'numeric' });
-  E.countHint = h('span', { class: 'hint' });
-  E.volHours = h('input', { readonly: true, 'aria-label': `Total volunteer hours, ${when}` });
-  E.volHours.addEventListener('focus', () => E.volHours.select());
-  E.notes = h('textarea', { id: uid + 'a', rows: '4', placeholder: 'What was done, one activity per line' });
-  E.notes.value = info ? info.notes : '';
-
-  E.names.addEventListener('input', () => {
-    const d = ensureDay(day.key);
-    d.names = parseNames(E.names.value);
-    if (d.count === d.names.length) d.count = null;
-    persist(); updateVol(day); refreshAllChips(); updateSummary();
-  });
-  E.names.addEventListener('focus', () => refreshChips(day));
-  E.count.addEventListener('input', () => {
-    const d = ensureDay(day.key), v = E.count.value.trim(), n = parseInt(v, 10);
-    d.count = v === '' || !Number.isInteger(n) || n < 0 || n === d.names.length ? null : n;
-    persist(); updateVol(day, true); updateSummary();
-  });
-  E.count.addEventListener('blur', () => updateVol(day));
-  E.notes.addEventListener('input', () => { ensureDay(day.key).notes = E.notes.value; persist(); });
-
-  const vol = h('div', { class: 'vol' },
-    h('div', { class: 'field' }, h('label', { for: uid + 'n' }, 'Volunteers'), E.names, E.chips),
-    h('div', { class: 'volnums' },
-      h('div', { class: 'field' }, h('label', { for: uid + 'c' }, 'Number of volunteers'), E.count, E.countHint),
-      h('div', { class: 'field hours' }, h('label', {}, 'Total volunteer hours'), h('div', { class: 'row' }, E.volHours, copyBtn(() => E.volHours.value)), h('span', { class: 'hint' }, 'Duration × volunteers'))),
-    h('div', { class: 'field' }, h('label', { for: uid + 'a' }, 'Activities and notes'), E.notes));
-
+  // Photo grid with a divider at each split
   const grid = h('div', { class: 'grid' });
-  for (const p of day.photos) grid.append(makeTile(p, day));
+  let cur = 0;
+  for (const p of day.photos) {
+    const gi = groupIndex(splits, p.date);
+    while (cur < gi) { grid.append(h('div', { class: 'gdiv' }, `Split at ${secLabel(splits[cur])}`)); cur++; }
+    grid.append(makeTile(p, day));
+  }
   const setAll = v => { day.photos.forEach(p => setSel(p, v)); updateDay(day); updateSummary(); };
+  E.copyRows = copyBtn(() => toTSV(dayRows(day)), 'Copy row for spreadsheet');
 
   E.sec = h('section', { class: 'day', id: 'day-' + day.key, 'aria-label': when },
     h('div', { class: 'dayhead' }, E.rev, h('h2', {}, when), E.meta),
     E.digest,
+    h('div', { class: 'splitbar' }, E.addSplit, E.splitHint),
     E.tl,
-    h('div', { class: 'fields' }, fs.wrap, fe.wrap, fh.wrap),
-    adj,
-    vol,
+    groupsBox,
     h('div', { class: 'dayactions' },
-      copyBtn(() => rowFor(day) || '', 'Copy row for spreadsheet'),
+      E.copyRows,
       h('button', { class: 'btn small', type: 'button', onclick: () => setAll(true) }, 'Select all'),
       h('button', { class: 'btn small', type: 'button', onclick: () => setAll(false) }, 'Select none')),
     grid);
@@ -1240,30 +1256,308 @@ function renderDay(day) {
   return E.sec;
 }
 
+function buildGroup(day, gi, uid, when) {
+  const G = {};
+  const id = uid + 'g' + gi;
+  const label = `${when}, group ${gi + 1}`;
+
+  G.range = h('span', { class: 'range' });
+  const titleKids = [h('h3', {}, `Group ${gi + 1}`), G.range];
+  if (gi > 0) {
+    titleKids.push(h('button', {
+      class: 'btn small', type: 'button', title: 'Merges this group into the one before it',
+      onclick: () => removeSplit(day, gi - 1)
+    }, 'Remove split'));
+  }
+  G.title = h('div', { class: 'gtitle' }, ...titleKids);
+
+  const field = (name, cls) => {
+    const input = h('input', { readonly: true, placeholder: 'No photos selected', 'aria-label': `${name}, ${label}` });
+    input.addEventListener('focus', () => input.select());
+    const hint = h('span', { class: 'hm' });
+    return { wrap: h('div', { class: 'field ' + (cls || '') }, h('label', {}, name), h('div', { class: 'row' }, input, copyBtn(() => input.value)), hint), input, hint };
+  };
+  const fs = field('Start'), fe = field('End'), fh = field('Duration (hours)', 'hours');
+  Object.assign(G, { start: fs.input, end: fe.input, hours: fh.input, startHint: fs.hint, endHint: fe.hint, hm: fh.hint });
+
+  // Time the photos don't show, in minutes
+  const a = adjOf(day.key, gi);
+  const adjInput = (name, key, hint) => {
+    const input = h('input', { id: id + key, class: 'mins', type: 'number', step: '5', min: '-1440', max: '1440', inputmode: 'numeric', placeholder: '0' });
+    input.value = a[key] ? String(a[key]) : '';
+    input.addEventListener('input', () => {
+      const g = ensureGroup(day.key, gi);
+      g.adjust = { ...adjOf(day.key, gi), [key]: clampMin(input.value || 0) };
+      persist(); updateDay(day); updateSummary();
+    });
+    return h('div', { class: 'field' }, h('label', { for: id + key }, name), h('div', { class: 'row' }, input, h('span', { class: 'unit' }, 'min')), h('span', { class: 'hint' }, hint));
+  };
+  const adj = h('div', { class: 'adj' },
+    h('p', { class: 'adjtitle' }, 'Time the photos don’t show'),
+    adjInput('Before first photo', 'before', 'Moves the start earlier'),
+    adjInput('After last photo', 'after', 'Moves the end later'),
+    adjInput('Travel', 'travel', 'Added to the duration'));
+
+  // Volunteer details
+  const info = groupInfo(day.key, gi);
+  G.names = h('textarea', { id: id + 'n', rows: '4', placeholder: 'One name per line', spellcheck: 'false' });
+  G.names.value = info ? info.names.join('\n') : '';
+  G.chips = h('div', { class: 'chips' });
+  G.count = h('input', { id: id + 'c', class: 'count', type: 'number', min: '0', step: '1', inputmode: 'numeric', 'aria-label': `Number of volunteers, ${label}` });
+  G.countHint = h('span', { class: 'hint' });
+  G.volHours = h('input', { readonly: true, 'aria-label': `Total volunteer hours, ${label}` });
+  G.volHours.addEventListener('focus', () => G.volHours.select());
+  G.notes = h('textarea', { id: id + 'a', rows: '4', placeholder: 'What was done, one activity per line' });
+  G.notes.value = info ? info.notes : '';
+
+  G.names.addEventListener('input', () => {
+    const g = ensureGroup(day.key, gi);
+    g.names = parseNames(G.names.value);
+    if (g.count === g.names.length) g.count = null;
+    persist(); updateGroup(day, gi, groupStats(day)[gi]); refreshAllChips(); updateSummary();
+  });
+  G.names.addEventListener('focus', () => refreshChips(day));
+  G.count.addEventListener('input', () => {
+    const g = ensureGroup(day.key, gi), v = G.count.value.trim(), n = parseInt(v, 10);
+    g.count = v === '' || !Number.isInteger(n) || n < 0 || n === g.names.length ? null : n;
+    persist(); updateGroup(day, gi, groupStats(day)[gi], true); updateSummary();
+  });
+  G.count.addEventListener('blur', () => updateGroup(day, gi, groupStats(day)[gi]));
+  G.notes.addEventListener('input', () => { ensureGroup(day.key, gi).notes = G.notes.value; persist(); });
+
+  const vol = h('div', { class: 'vol' },
+    h('div', { class: 'field' }, h('label', { for: id + 'n' }, 'Volunteers'), G.names, G.chips),
+    h('div', { class: 'volnums' },
+      h('div', { class: 'field' }, h('label', { for: id + 'c' }, 'Number of volunteers'), G.count, G.countHint),
+      h('div', { class: 'field hours' }, h('label', {}, 'Total volunteer hours'), h('div', { class: 'row' }, G.volHours, copyBtn(() => G.volHours.value)), h('span', { class: 'hint' }, 'Duration × volunteers'))),
+    h('div', { class: 'field' }, h('label', { for: id + 'a' }, 'Activities and notes'), G.notes));
+
+  day.els.groups[gi] = G;
+  return h('div', { class: 'group' }, G.title, h('div', { class: 'fields' }, fs.wrap, fe.wrap, fh.wrap), adj, vol);
+}
+
+/* ---- Splits ---- */
+let splitDay = null;   // the day currently in "Add split" mode
+function setSplitMode(day, mode) {
+  if (splitDay && splitDay !== day) { const other = splitDay; other.mode = null; other.hover = null; updateSplitUI(other); drawOverlay(other); }
+  day.mode = mode; day.hover = null;
+  splitDay = mode ? day : null;
+  updateSplitUI(day); drawOverlay(day);
+}
+function updateSplitUI(day) {
+  const E = day.els, adding = day.mode === 'add';
+  E.addSplit.classList.toggle('on', adding);
+  E.addSplit.textContent = adding ? 'Cancel' : 'Add split';
+  E.tl.classList.toggle('splitting', adding);
+  if (!adding) {
+    E.splitHint.textContent = splitsOf(day.key).length ? 'Drag a split on the timeline to move it.' : 'Split the day when the volunteer work happened in separate parts.';
+    return;
+  }
+  if (day.hover == null) { E.splitHint.textContent = 'Click the timeline where the split should go. Shaded stretches have no selected photos. Esc cancels.'; return; }
+  const parts = groupStats(day, tentativeSplits(day)).map(g => g ? `${t12(g.rs)} to ${t12(g.re)}` : 'no selected photos');
+  E.splitHint.textContent = `Split at ${secLabel(day.hover)}: ${parts.join(', then ')}`;
+}
+function tentativeSplits(day) {
+  const splits = splitsOf(day.key).slice();
+  if (day.drag) splits[day.drag.j] = day.drag.sec;
+  if (day.mode === 'add' && day.hover != null && !splits.includes(day.hover)) { splits.push(day.hover); splits.sort((a, b) => a - b); }
+  return splits;
+}
+function secAtX(day, clientX) {
+  const r = day.els.tl.getBoundingClientRect(), sc = day.scale;
+  const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+  const sec = Math.round((sc.lo + f * (sc.hi - sc.lo)) * 60) * 60;   // snap to the minute
+  return Math.min(86340, Math.max(60, sec));
+}
+function addSplit(day, sec) {
+  const d = ensureDay(day.key);
+  if (d.splits.includes(sec)) return;
+  const splits = [...d.splits, sec].sort((a, b) => a - b);
+  const idx = splits.indexOf(sec);
+  d.groups.splice(idx + 1, 0, blankGroup());   // existing details stay with the earlier part
+  d.splits = splits;
+  persist(); rerenderDay(day); updateSummary();
+}
+function removeSplit(day, j) {
+  const d = ensureDay(day.key);
+  const a = cleanGroup(d.groups[j]), b = cleanGroup(d.groups[j + 1]);
+  const seen = new Set(a.names.map(n => n.toLowerCase()));
+  const names = [...a.names, ...b.names.filter(n => !seen.has(n.toLowerCase()))];
+  const count = a.count == null && b.count == null ? null : Math.max(countOf(a), countOf(b), names.length);
+  const merged = {
+    names, count: count === names.length ? null : count,
+    notes: [a.notes.trim(), b.notes.trim()].filter(Boolean).join('\n'),
+    adjust: { before: a.adjust.before, after: b.adjust.after, travel: a.adjust.travel + b.adjust.travel }
+  };
+  d.groups.splice(j, 2, merged);
+  d.splits.splice(j, 1);
+  persist(); rerenderDay(day); updateSummary();
+}
+function wireTimeline(day) {
+  const tl = day.els.tl;
+  tl.addEventListener('pointermove', e => {
+    if (!day.scale) return;
+    if (day.drag) {
+      const splits = splitsOf(day.key), j = day.drag.j;
+      const lo = j > 0 ? splits[j - 1] + 60 : 60, hi = j < splits.length - 1 ? splits[j + 1] - 60 : 86340;
+      day.drag.sec = Math.min(hi, Math.max(lo, secAtX(day, e.clientX)));
+      drawOverlay(day);
+    } else if (day.mode === 'add') {
+      day.hover = secAtX(day, e.clientX);
+      drawOverlay(day); updateSplitUI(day);
+    }
+  });
+  tl.addEventListener('pointerleave', () => { if (day.mode === 'add' && !day.drag) { day.hover = null; drawOverlay(day); updateSplitUI(day); } });
+  tl.addEventListener('click', e => {
+    if (day.mode !== 'add' || !day.scale) return;
+    addSplit(day, secAtX(day, e.clientX));
+  });
+  tl.addEventListener('pointerup', e => {
+    if (!day.drag) return;
+    const { j, sec } = day.drag, d = ensureDay(day.key);
+    day.drag = null;
+    try { tl.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (sec !== d.splits[j]) { d.splits[j] = sec; persist(); rerenderDay(day); updateSummary(); }
+    else drawOverlay(day);
+  });
+}
+
+/* ---- Group blocks, summary line, timeline ---- */
 let chipTimer = 0;
 function refreshAllChips() { clearTimeout(chipTimer); chipTimer = setTimeout(() => state.days.forEach(refreshChips), 250); }
 function refreshChips(day) {
-  const E = day.els, d = dayInfo(day.key);
-  const have = new Set((d ? d.names : []).map(n => n.toLowerCase()));
-  const names = knownNames().filter(n => !have.has(n.toLowerCase())).slice(0, 12);
-  E.chips.replaceChildren(...names.map(n => h('button', {
-    class: 'chip', type: 'button', 'aria-label': `Add ${n}`,
-    onclick: () => {
-      const cur = E.names.value.replace(/\s+$/, '');
-      E.names.value = (cur ? cur + '\n' : '') + n;
-      E.names.dispatchEvent(new Event('input'));
-    }
-  }, n)));
+  const known = knownNames();
+  day.els.groups.forEach((G, gi) => {
+    const g = groupInfo(day.key, gi);
+    const have = new Set((g ? g.names : []).map(n => n.toLowerCase()));
+    G.chips.replaceChildren(...known.filter(n => !have.has(n.toLowerCase())).slice(0, 12).map(n => h('button', {
+      class: 'chip', type: 'button', 'aria-label': `Add ${n}`,
+      onclick: () => {
+        const cur = G.names.value.replace(/\s+$/, '');
+        G.names.value = (cur ? cur + '\n' : '') + n;
+        G.names.dispatchEvent(new Event('input'));
+      }
+    }, n)));
+  });
 }
 
-function updateVol(day, keepCountField) {
-  const E = day.els, d = dayInfo(day.key), st = stats(day);
-  const named = d ? d.names.length : 0, n = volCount(day.key);
-  if (!keepCountField) E.count.value = n ? String(n) : '';
-  E.count.setAttribute('aria-label', `Number of volunteers, ${longDate(day.photos[0].date)}`);
-  E.countHint.textContent = d && d.count != null ? `Entered by hand (${named} named)` : 'Counted from names. Type a number to change it.';
-  E.volHours.value = st && n ? numStr(volHours(dayTotals(day.key, st.rs, st.re).ms, n)) : '';
-  E.volHours.placeholder = st ? 'Add volunteers' : 'No photos selected';
+function updateGroup(day, gi, st, keepCountField) {
+  const G = day.els.groups[gi], g = groupInfo(day.key, gi), multi = splitsOf(day.key).length > 0;
+  G.title.hidden = !multi;
+  G.range.textContent = st ? `${t12(st.rs)} to ${t12(st.re)} in the photos` : 'No selected photos in this part';
+  let ms = 0;
+  if (st) {
+    const T = dayTotals(day.key, gi, st.rs, st.re);
+    ms = T.ms;
+    G.start.value = fmtStamp(T.start); G.end.value = fmtStamp(T.end);
+    G.hours.value = numStr(T.ms / 3600000);
+    G.startHint.textContent = `First photo ${t12(st.rs)}`;
+    G.endHint.textContent = `Last photo ${t12(st.re)}`;
+    G.hm.textContent = T.addMs ? `Photos ${hm(T.photoMs)}, ${hmSigned(T.addMs)} adjusted` : `Photos ${hm(T.photoMs)}`;
+  } else {
+    G.start.value = G.end.value = G.hours.value = '';
+    G.startHint.textContent = G.endHint.textContent = G.hm.textContent = '';
+  }
+  const named = g ? g.names.length : 0, n = countOf(g);
+  if (!keepCountField) G.count.value = n ? String(n) : '';
+  G.countHint.textContent = g && g.count != null ? `Entered by hand (${named} named)` : 'Counted from names. Type a number to change it.';
+  G.volHours.value = st && n ? numStr(volHours(ms, n)) : '';
+  G.volHours.placeholder = st ? 'Add volunteers' : 'No photos selected';
+}
+
+function updateDay(day) {
+  const E = day.els, gs = groupStats(day), info = dayInfo(day.key), reviewed = !!(info && info.reviewed);
+  const selected = gs.reduce((n, g) => n + (g ? g.count : 0), 0);
+  E.sec.classList.toggle('reviewed', reviewed);
+  E.sec.classList.toggle('empty', !selected);
+  E.rev.setAttribute('aria-pressed', String(reviewed));
+  E.rev.title = reviewed ? 'Reviewed. Click to expand this day again.' : 'Mark this day reviewed and collapse it';
+  E.meta.textContent = selected ? `${selected} of ${day.photos.length} photos selected` : (reviewed ? 'No volunteer photos' : `0 of ${day.photos.length} photos selected`);
+  E.copyRows.textContent = E.copyRows._label = gs.filter(Boolean).length > 1 ? 'Copy rows for spreadsheet' : 'Copy row for spreadsheet';
+  gs.forEach((st, gi) => updateGroup(day, gi, st));
+  if (!reviewed) drawTimeline(day);
+  updateSplitUI(day);
+  fillDigest(day, gs, reviewed);
+}
+
+// Collapsed view of a reviewed day: one line per group
+function fillDigest(day, gs, reviewed) {
+  const E = day.els;
+  if (!reviewed || !gs.some(Boolean)) { E.digest.replaceChildren(); return; }
+  const multi = gs.length > 1, lines = [];
+  gs.forEach((st, gi) => {
+    if (!st) return;
+    const g = groupInfo(day.key, gi), T = dayTotals(day.key, gi, st.rs, st.re), n = countOf(g);
+    lines.push(h('div', { class: 'line' },
+      multi ? h('span', { class: 'glabel' }, `Group ${gi + 1}`) : null,
+      h('strong', {}, `${t12(T.start)} to ${t12(T.end)}`),
+      h('span', {}, `${numStr(T.ms / 3600000)} hours` + (T.addMs ? ` (${hmSigned(T.addMs)} adjusted)` : '')),
+      h('span', {}, `${n} ${n === 1 ? 'volunteer' : 'volunteers'}`),
+      h('strong', {}, `${numStr(volHours(T.ms, n))} volunteer hours`)));
+    if (g && g.names.length) lines.push(h('div', { class: 'line' }, g.names.join(', ')));
+    const acts = g ? g.notes.split('\n').map(x => x.trim()).filter(Boolean) : [];
+    if (acts.length) lines.push(h('div', { class: 'line muted' }, acts.join('; ')));
+  });
+  E.digest.replaceChildren(...lines);
+}
+
+// Base layer: axis, photo ticks, hour labels. Overlay: bands, splits, guide.
+function drawTimeline(day) {
+  const E = day.els, tl = E.tl;
+  const hr = d => d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+  let lo = Math.floor(hr(day.photos[0].date)), hi = Math.ceil(hr(day.photos[day.photos.length - 1].date) + 0.001);
+  for (const sp of splitsOf(day.key)) { lo = Math.min(lo, Math.floor(sp / 3600)); hi = Math.max(hi, Math.ceil(sp / 3600)); }
+  while (hi - lo < 4) { if (lo > 0) lo--; if (hi - lo < 4 && hi < 24) hi++; }
+  day.scale = { lo, hi };
+  const span = hi - lo, pos = x => (x - lo) / span * 100;
+  const frag = document.createDocumentFragment();
+  frag.append(h('div', { class: 'axis' }));
+  for (const p of day.photos) frag.append(h('div', { class: 'tick' + (p.selected ? '' : ' off'), style: `left:${pos(hr(p.date))}%` }));
+  const step = span <= 8 ? 1 : span <= 14 ? 2 : 3;
+  for (let x = lo; x <= hi; x += step) {
+    const cls = 'hr' + (x === lo ? ' first' : '') + (x + step > hi && x !== lo ? ' last' : '');
+    frag.append(h('span', { class: cls, style: `left:${pos(x)}%` }, hourLabel(x)));
+  }
+  E.over = h('div', { class: 'tlover' });
+  frag.append(E.over);
+  tl.replaceChildren(frag);
+  drawOverlay(day);
+}
+function drawOverlay(day) {
+  const E = day.els;
+  if (!E.over || !day.scale) return;
+  const { lo, hi } = day.scale;
+  const pos = sec => Math.min(100, Math.max(0, (sec / 3600 - lo) / (hi - lo) * 100));
+  const splits = tentativeSplits(day), gs = groupStats(day, splits);
+  const frag = document.createDocumentFragment();
+
+  if (day.mode === 'add') {            // shade long stretches with no selected photos
+    const sel = day.photos.filter(p => p.selected).map(p => secOfDay(p.date));
+    for (let i = 1; i < sel.length; i++) if (sel[i] - sel[i - 1] >= 30 * 60)
+      frag.append(h('div', { class: 'gap', style: `left:${pos(sel[i - 1])}%;width:${pos(sel[i]) - pos(sel[i - 1])}%` }));
+  }
+  for (const g of gs) if (g) {
+    const a = pos(secOfDay(g.s)), b = pos(secOfDay(g.e));
+    frag.append(h('div', { class: 'band', style: `left:${a}%;width:${b - a}%` }));
+  }
+  splitsOf(day.key).forEach((orig, j) => {
+    const sec = day.drag && day.drag.j === j ? day.drag.sec : orig;
+    const x = h('button', { type: 'button', 'aria-label': `Remove split at ${secLabel(sec)}`, title: 'Remove split' }, '×');
+    x.addEventListener('pointerdown', e => e.stopPropagation());
+    x.addEventListener('click', e => { e.stopPropagation(); removeSplit(day, j); });
+    const m = h('div', { class: 'split', style: `left:${pos(sec)}%`, title: 'Drag to move' }, h('span', {}, secLabel(sec)), x);
+    m.addEventListener('pointerdown', e => {
+      if (day.mode === 'add') return;
+      e.preventDefault(); e.stopPropagation();
+      day.drag = { j, sec: orig };
+      try { E.tl.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    m.addEventListener('click', e => e.stopPropagation());
+    frag.append(m);
+  });
+  if (day.mode === 'add' && day.hover != null)
+    frag.append(h('div', { class: 'guide', style: `left:${pos(day.hover)}%` }, h('span', {}, secLabel(day.hover))));
+  E.over.replaceChildren(frag);
 }
 
 const tpl = $('#tileTpl').content.firstElementChild;
@@ -1302,75 +1596,13 @@ function setSel(p, v) {
   if (p.tileEl) { p.tileEl.classList.toggle('on', v); p.tileEl.querySelector('.pick').setAttribute('aria-pressed', String(v)); }
 }
 
-function updateDay(day) {
-  const E = day.els, st = stats(day), info = dayInfo(day.key), reviewed = !!(info && info.reviewed);
-  E.sec.classList.toggle('reviewed', reviewed);
-  E.sec.classList.toggle('empty', !st);
-  E.rev.setAttribute('aria-pressed', String(reviewed));
-  E.rev.title = reviewed ? 'Reviewed. Click to expand this day again.' : 'Mark this day reviewed and collapse it';
-  E.meta.textContent = st ? `${st.count} of ${day.photos.length} photos selected` : (reviewed ? 'No volunteer photos' : `0 of ${day.photos.length} photos selected`);
-  if (st) {
-    const T = dayTotals(day.key, st.rs, st.re);
-    E.start.value = fmtStamp(T.start); E.end.value = fmtStamp(T.end);
-    E.hours.value = numStr(T.ms / 3600000);
-    E.startHint.textContent = `First photo ${t12(st.rs)}`;
-    E.endHint.textContent = `Last photo ${t12(st.re)}`;
-    E.hm.textContent = T.addMs ? `Photos ${hm(T.photoMs)}, ${hmSigned(T.addMs)} adjusted` : `Photos ${hm(T.photoMs)}`;
-  } else {
-    E.start.value = E.end.value = E.hours.value = '';
-    E.startHint.textContent = E.endHint.textContent = E.hm.textContent = '';
-  }
-  if (!reviewed) drawTimeline(day, st);
-  updateVol(day);
-  fillDigest(day, st, reviewed);
-}
-
-// Collapsed view of a reviewed day
-function fillDigest(day, st, reviewed) {
-  const E = day.els;
-  if (!reviewed || !st) { E.digest.replaceChildren(); return; }
-  const d = dayInfo(day.key), T = dayTotals(day.key, st.rs, st.re), n = volCount(day.key);
-  const lines = [h('div', { class: 'line' },
-    h('strong', {}, `${t12(T.start)} to ${t12(T.end)}`),
-    h('span', {}, `${numStr(T.ms / 3600000)} hours` + (T.addMs ? ` (${hmSigned(T.addMs)} adjusted)` : '')),
-    h('span', {}, `${n} ${n === 1 ? 'volunteer' : 'volunteers'}`),
-    h('strong', {}, `${numStr(volHours(T.ms, n))} volunteer hours`))];
-  if (d && d.names.length) lines.push(h('div', { class: 'line' }, d.names.join(', ')));
-  const acts = d ? d.notes.split('\n').map(x => x.trim()).filter(Boolean) : [];
-  if (acts.length) lines.push(h('div', { class: 'line muted' }, acts.join('; ')));
-  E.digest.replaceChildren(...lines);
-}
-
-function drawTimeline(day, st) {
-  const tl = day.els.tl;
-  const hr = d => d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-  let lo = Math.floor(hr(day.photos[0].date)), hi = Math.ceil(hr(day.photos[day.photos.length - 1].date) + 0.001);
-  while (hi - lo < 4) { if (lo > 0) lo--; if (hi - lo < 4 && hi < 24) hi++; }
-  const span = hi - lo, pos = x => (x - lo) / span * 100;
-  const frag = document.createDocumentFragment();
-  frag.append(h('div', { class: 'axis' }));
-  if (st) { const a = pos(hr(st.s)), b = pos(hr(st.e)); frag.append(h('div', { class: 'band', style: `left:${a}%;width:${b - a}%` })); }
-  for (const p of day.photos) frag.append(h('div', { class: 'tick' + (p.selected ? '' : ' off'), style: `left:${pos(hr(p.date))}%` }));
-  const step = span <= 8 ? 1 : span <= 14 ? 2 : 3;
-  for (let x = lo; x <= hi; x += step) {
-    const cls = 'hr' + (x === lo ? ' first' : '') + (x + step > hi && x !== lo ? ' last' : '');
-    frag.append(h('span', { class: cls, style: `left:${pos(x)}%` }, hourLabel(x)));
-  }
-  tl.replaceChildren(frag);
-  tl.setAttribute('aria-label', st ? `Photos from ${t12(st.s)} to ${t12(st.e)}` : 'No photos selected');
-}
-
-function rowFor(day) {
-  const st = stats(day);
-  return st ? toTSV([logRow(day.key, st)]) : null;
-}
-
 function updateSummary() {
   const shown = state.days.reduce((n, d) => n + d.photos.length, 0);
   let total = 0, withHours = 0, vh = 0, reviewed = 0;
   for (const d of state.days) {
-    const st = stats(d);
-    if (st) { const T = dayTotals(d.key, st.rs, st.re); total += T.ms; withHours++; vh += volHours(T.ms, volCount(d.key)); }
+    const gs = groupStats(d);
+    if (gs.some(Boolean)) withHours++;
+    gs.forEach((st, gi) => { if (!st) return; const T = dayTotals(d.key, gi, st.rs, st.re); total += T.ms; vh += volHours(T.ms, volCount(d.key, gi)); });
     if ((dayInfo(d.key) || {}).reviewed) reviewed++;
   }
   $('#sumMain').textContent = `${numStr(vh)} volunteer hours across ${withHours} ${withHours === 1 ? 'day' : 'days'}`;
@@ -1474,24 +1706,31 @@ function reportDays() {
   const out = [];
   for (const [key, photos] of [...days.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     if ((from && key < from) || (to && key > to)) continue;
-    const s = photos[0].t, e = photos[photos.length - 1].t;
-    const st = { s, e, rs: roundTime(s), re: roundTime(e) };
-    const T = dayTotals(key, st.rs, st.re), n = volCount(key);
     for (const ph of photos) ph.copies = copies.get(ph.key) || [];
-    out.push({ key, photos, st, T, ms: T.ms, n, vh: volHours(T.ms, n), info: dayInfo(key) });
+    const parts = splitList(photos, splitsOf(key));
+    const used = parts.filter(x => x.length).length;
+    parts.forEach((list, gi) => {
+      if (!list.length) return;
+      const s = list[0].t, e = list[list.length - 1].t;
+      const st = { s, e, rs: roundTime(s), re: roundTime(e) };
+      const T = dayTotals(key, gi, st.rs, st.re), n = volCount(key, gi);
+      out.push({ key, gi, multi: used > 1, photos: list, st, T, ms: T.ms, n, vh: volHours(T.ms, n), info: groupInfo(key, gi) });
+    });
   }
   out.missing = missing;
   return out;
 }
-function peopleTotals(days) {
+const rowLabel = d => d.multi ? `${d.key} (group ${d.gi + 1})` : d.key;
+function peopleTotals(rows) {
   const map = new Map();
-  for (const d of days) for (const name of (d.info ? d.info.names : [])) {
+  for (const d of rows) for (const name of (d.info ? d.info.names : [])) {
     const k = name.toLowerCase();
-    const r = map.get(k) || { name, days: 0, hours: 0 };
-    r.days++; r.hours += d.ms / 3600000;
+    const r = map.get(k) || { name, dates: new Set(), hours: 0 };
+    r.dates.add(d.key); r.hours += d.ms / 3600000;
     map.set(k, r);
   }
-  return [...map.values()].sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
+  return [...map.values()].map(r => ({ name: r.name, days: r.dates.size, hours: r.hours }))
+    .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
 }
 const t12s = d => t12(d).replace(' ', `:${pad(d.getSeconds())} `);
 const folderOf = path => { const i = path.lastIndexOf('/'); return i > 0 ? path.slice(0, i) : ''; };
@@ -1502,7 +1741,7 @@ const toCSV = rows => '\ufeff' + rows.map(r => r.map(csvCell).join(',')).join('\
 function logCSV(days) {
   const rows = [LOG_HEAD];
   let n = 0, dur = 0, vh = 0;
-  for (const d of days) { rows.push(logRow(d.key, d.st)); n += d.n; dur += d.ms / 3600000; vh += d.vh; }
+  for (const d of days) { rows.push(logRow(d.key, d.gi, d.st)); n += d.n; dur += d.ms / 3600000; vh += d.vh; }
   rows.push(['Total', '', n, '', '', numStr(dur), numStr(vh), '']);
   return toCSV(rows);
 }
@@ -1512,9 +1751,9 @@ function peopleCSV(days) {
   return toCSV(rows);
 }
 function photoListRows(days) {
-  const rows = [['Date', 'Time taken', 'Taken (ISO 8601)', 'File name', 'Folder', 'File size (bytes)', 'Duplicate copies']];
+  const rows = [['Date', 'Group', 'Time taken', 'Taken (ISO 8601)', 'File name', 'Folder', 'File size (bytes)', 'Duplicate copies']];
   for (const d of days) for (const ph of d.photos)
-    rows.push([d.key, t12s(ph.t), isoLocal(ph.t), baseName(ph.path), folderOf(ph.path), ph.key.slice(ph.key.lastIndexOf('|') + 1), ph.copies.join(' | ')]);
+    rows.push([d.key, d.gi + 1, t12s(ph.t), isoLocal(ph.t), baseName(ph.path), folderOf(ph.path), ph.key.slice(ph.key.lastIndexOf('|') + 1), ph.copies.join(' | ')]);
   return rows;
 }
 function rangeText(days) {
@@ -1540,22 +1779,24 @@ function openReport() {
     const visits = days.reduce((n, d) => n + d.n, 0);
     const people = peopleTotals(days);
     const unnamed = days.some(d => d.n > (d.info ? d.info.names.length : 0));
-    $('#repLead').textContent = `${numStr(totalVH)} total volunteer hours over ${days.length} ${days.length === 1 ? 'day' : 'days'}. ` +
+    const nDates = new Set(days.map(d => d.key)).size;
+    $('#repLead').textContent = `${numStr(totalVH)} total volunteer hours over ${nDates} ${nDates === 1 ? 'day' : 'days'}` +
+      (days.length > nDates ? ` (${days.length} outings, some days split into groups)` : '') + '. ' +
       `${nf.format(people.length)} different named ${people.length === 1 ? 'volunteer' : 'volunteers'} and ${nf.format(visits)} volunteer ${visits === 1 ? 'visit' : 'visits'} in total` +
       `${unnamed ? ' (some days include volunteers without names)' : ''}. ${rangeText(days)}`;
 
     const noVol = days.filter(d => !d.n);
-    if (noVol.length) parts.push(h('p', { class: 'warn' }, `${noVol.length} ${noVol.length === 1 ? 'day has' : 'days have'} no volunteers entered yet, so ${noVol.length === 1 ? 'it adds' : 'they add'} 0 volunteer hours: ${noVol.map(d => d.key).join(', ')}.`));
+    if (noVol.length) parts.push(h('p', { class: 'warn' }, `${noVol.length} ${noVol.length === 1 ? 'row has' : 'rows have'} no volunteers entered yet, so ${noVol.length === 1 ? 'it adds' : 'they add'} 0 volunteer hours: ${noVol.map(rowLabel).join(', ')}.`));
     const from = $('#from').value, to = $('#to').value, inReport = new Set(days.map(d => d.key));
     const orphan = Object.entries(cleanDays(saved.days))
-      .filter(([k, v]) => !inReport.has(k) && (v.names.length || v.count || v.notes.trim()) && (!from || k >= from) && (!to || k <= to))
+      .filter(([k, v]) => !inReport.has(k) && v.groups.some(g => g.names.length || g.count || g.notes.trim()) && (!from || k >= from) && (!to || k <= to))
       .map(([k]) => k).sort();
     if (orphan.length) parts.push(h('p', { class: 'warn' }, `${orphan.length} ${orphan.length === 1 ? 'day has' : 'days have'} volunteer details but no selected photos, so ${orphan.length === 1 ? 'it isn’t' : 'they aren’t'} in this report: ${orphan.join(', ')}.`));
 
     const tbody = h('tbody');
     for (const d of days) {
       tbody.append(h('tr', {},
-        h('td', {}, d.key), h('td', { class: 'multi' }, d.info ? d.info.names.join('\n') : ''),
+        h('td', {}, d.key, d.multi ? h('div', { class: 'hint' }, `Group ${d.gi + 1}`) : null), h('td', { class: 'multi' }, d.info ? d.info.names.join('\n') : ''),
         h('td', { class: 'num' }, String(d.n)), h('td', {}, t12pad(d.T.start)), h('td', {}, t12pad(d.T.end)),
         h('td', { class: 'num' }, numStr(d.ms / 3600000)), h('td', { class: 'num' }, numStr(d.vh)),
         h('td', { class: 'acts' }, d.info ? d.info.notes.trim() : '')));
@@ -1616,7 +1857,7 @@ $('#openReport').onclick = openReport;
 $('#repClose').onclick = () => $('#report').close();
 $('#report').addEventListener('click', e => { if (e.target === $('#report')) $('#report').close(); });
 $('#dlLog').onclick = e => { const days = reportDays(); if (days.length) saveFile(`volunteer-log-${stampName()}.csv`, logCSV(days), e.currentTarget); };
-$('#copyLog').onclick = e => { const days = reportDays(); copyText(toTSV(days.map(d => logRow(d.key, d.st))), e.currentTarget); };
+$('#copyLog').onclick = e => { const days = reportDays(); copyText(toTSV(days.map(d => logRow(d.key, d.gi, d.st))), e.currentTarget); };
 $('#dlPeople').onclick = e => { const days = reportDays(); if (days.length) saveFile(`volunteer-hours-by-person-${stampName()}.csv`, peopleCSV(days), e.currentTarget); };
 $('#dlPhotos').onclick = e => { const days = reportDays(); if (days.length) saveFile(`volunteer-photos-${stampName()}.csv`, toCSV(photoListRows(days)), e.currentTarget); };
 $('#order').onchange = e => { state.order = e.target.value; rebuild(); };
@@ -1624,7 +1865,7 @@ $('#format').onchange = e => { state.format = e.target.value; state.days.forEach
 $('#round').onchange = e => { state.round = +e.target.value; state.days.forEach(updateDay); updateSummary(); };
 $('#copyAll').onclick = e => {
   const rows = [];
-  for (const d of state.days.slice().sort((a, b) => a.key.localeCompare(b.key))) { const st = stats(d); if (st) rows.push(logRow(d.key, st)); }
+  for (const d of state.days.slice().sort((a, b) => a.key.localeCompare(b.key))) rows.push(...dayRows(d));
   copyText(toTSV(rows), e.currentTarget);
 };
 $('#clear').onclick = () => {
@@ -1658,6 +1899,7 @@ function showResume() {
 for (const id of ['#from', '#to', '#format', '#order', '#round']) $(id).addEventListener('change', persist);
 $('#onlySel').addEventListener('click', persist);
 window.addEventListener('pagehide', flushSave, onLife);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && splitDay) setSplitMode(splitDay, null); }, onLife);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave(); }, onLife);
 
 $('#dlBackup').onclick = e => {
@@ -1698,7 +1940,7 @@ $('#forgetBtn').onclick = () => {
 /* ================= Hot reload =================
    index.html loads this file and swaps in a new version when it changes on
    disk. These hooks let it do that without losing the loaded photos. */
-shared.canReload = () => !state.reading
+shared.canReload = () => !state.reading && !splitDay
   && !$('#viewer').open && !$('#report').open
   && !(document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName) && !document.activeElement.readOnly);
 shared.teardown = () => {
