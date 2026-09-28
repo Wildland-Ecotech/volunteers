@@ -108,6 +108,10 @@ button,input,select{font:inherit;color:inherit}
 .adjtitle{flex:1 1 100%;margin:0;font-size:13px;font-weight:700;color:var(--muted)}
 .adj .field input.mins{width:6em;font-weight:700}
 .unit{align-self:center;color:var(--muted);font-size:14px}
+/* Step 1, finding the volunteer photos: a day with nothing selected shows only its header and photos.
+   Step 2, recording what happened: times and volunteer fields appear once a photo is selected. */
+.day.empty:not(.reviewed) .splitbar,.day.empty:not(.reviewed) .tl,.day.empty:not(.reviewed) .groups,.day.empty:not(.reviewed) .dayactions{display:none}
+.day.empty:not(.reviewed) .dayhead{margin-bottom:14px}
 .day.reviewed{padding:14px 22px;margin:10px 0}
 .day.reviewed h2{font-size:20px}
 .day.reviewed .tl,.day.reviewed .splitbar,.day.reviewed .groups,.day.reviewed .dayactions{display:none}
@@ -1577,7 +1581,12 @@ function makeTile(p, day) {
     pick.append(h('span', { class: 'flag', title: 'No camera date or dated file name was found, so this uses the file’s modified time. Check it looks right.' }, 'File date'));
   }
   if (p.noPreview) t.classList.add('noprev');
-  pick.addEventListener('click', () => { setSel(p, !p.selected); updateDay(day); updateSummary(); });
+  pick.addEventListener('click', () => {
+    const before = t.getBoundingClientRect().top;
+    setSel(p, !p.selected); updateDay(day); updateSummary();
+    const shift = t.getBoundingClientRect().top - before;
+    if (shift) window.scrollBy(0, shift);
+  });
   const zoom = t.querySelector('.zoom');
   zoom.setAttribute('aria-label', `View ${p.name} larger`);
   zoom.addEventListener('click', () => openViewer(day, p));
