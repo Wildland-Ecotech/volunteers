@@ -1,0 +1,17 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: ${PROJECT_NAME:-volunteer-hours}-nginx
+    restart: unless-stopped
+    ports:
+      # Only reachable from this computer
+      - "127.0.0.1:${NGINX_PORT:-8088}:80"
+    volumes:
+      - ./public:/usr/share/nginx/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./data:/srv/data
+    # Make sure nginx can write the saved-data folder, then start nginx
+    command: >
+      sh -c "mkdir -p /srv/data/backups /srv/data/.tmp &&
+             chown -R nginx:nginx /srv/data &&
+             exec nginx -g 'daemon off;'"
