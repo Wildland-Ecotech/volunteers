@@ -28,9 +28,18 @@ Back up the `data/` folder along with your photos.
 The files in `data/` are owned by the container's nginx user, so use `sudo` to
 delete or move them.
 
-## Update the app
+## Update the app (hot reload)
 
-Replace `public/index.html` and reload the page. Your data isn't affected.
+The app is split in two:
+
+- `public/index.html` is a small loader that holds your loaded photos in browser memory.
+- `public/app.html` is the app itself.
+
+Replace or edit `public/app.html` and the open page picks it up within a couple of
+seconds, keeping the photos you've already loaded. It waits while you're typing,
+reading photos, or have the viewer or report open. Nothing is uploaded or copied.
+
+Only a change to `index.html` itself needs a normal page refresh.
 
 ## Stop it
 

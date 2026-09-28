@@ -1,0 +1,1728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Volunteer Photo Hours</title>
+<style>
+:root{
+  --bg:#EDF1F5; --surface:#FFFFFF; --ink:#15212C; --muted:#586878; --line:#D3DBE3;
+  --accent:#2446C4; --accent-ink:#FFFFFF; --mark:#E9A620; --mark-soft:rgba(233,166,32,.24);
+  --field:#F5F7FA; --tile:#DCE3EA;
+  --display:"Segoe UI Variable Display","SF Pro Display",system-ui,-apple-system,"Ubuntu","Cantarell",sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI","Ubuntu","Cantarell","Helvetica Neue",Arial,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F151C; --surface:#18212B; --ink:#E6ECF2; --muted:#94A4B4; --line:#2B3744;
+    --accent:#809DFF; --accent-ink:#0F151C; --mark:#F2B84A; --mark-soft:rgba(242,184,74,.2);
+    --field:#121A22; --tile:#222D39; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F151C; --surface:#18212B; --ink:#E6ECF2; --muted:#94A4B4; --line:#2B3744;
+  --accent:#809DFF; --accent-ink:#0F151C; --mark:#F2B84A; --mark-soft:rgba(242,184,74,.2);
+  --field:#121A22; --tile:#222D39; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 140px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
+.wrap{max-width:1200px;margin:0 auto;padding:0 20px}
+h1,h2{font-family:var(--display);font-weight:700;letter-spacing:-.01em;line-height:1.15;margin:0}
+button,input,select{font:inherit;color:inherit}
+.btn{font-weight:700;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{padding:6px 10px;font-size:14px}
+.btn:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+.top{padding:28px 0 8px}
+.top h1{font-size:22px}
+.intro{margin:40px 0 60px;display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center}
+.intro h2{font-size:clamp(32px,5vw,52px);max-width:14ch}
+.intro p{color:var(--muted);max-width:52ch;margin:18px 0 0;font-size:17px}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:36px 28px;background:var(--surface);text-align:center}
+.drop.over{border-color:var(--accent);background:var(--mark-soft)}
+.drop .btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+.drop small{color:var(--muted);display:block}
+.demo{margin-top:26px}
+
+/* Reading progress */
+.progress{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;margin:24px 0}
+.progress h2{font-size:22px}
+.progress p{margin:6px 0 0;color:var(--muted)}
+.meter{height:10px;background:var(--line);border-radius:5px;overflow:hidden;margin:14px 0 12px}
+.meter i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+.note{margin:14px 0;color:var(--muted)}
+
+/* Toolbar */
+.bar{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.bar .wrap{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding-top:12px;padding-bottom:12px}
+.summary{margin-right:auto;min-width:0}
+.summary strong{font-family:var(--display);font-size:19px;display:block;line-height:1.2}
+.summary span{color:var(--muted);font-size:14px;display:block}
+#thumbStat{color:var(--accent);font-weight:700}
+.ctl{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:2px}
+.ctl select,.ctl input{font-size:14px;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--field)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Day */
+.day{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;margin:20px 0}
+.dayhead{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
+.dayhead h2{font-size:24px;flex:1 1 auto;min-width:0}
+.rev{display:inline-flex;align-items:center;gap:8px;flex:none;width:8.4em;font:700 14px var(--body);padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.rev .box{width:20px;height:20px;border-radius:5px;border:2px solid var(--muted);flex:none;position:relative}
+.rev[aria-pressed="true"]{background:var(--mark-soft);border-color:var(--mark)}
+.rev[aria-pressed="true"] .box{background:var(--mark);border-color:var(--mark)}
+.rev[aria-pressed="true"] .box::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid #2A1E00;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.rev:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.digest{display:none;flex-direction:column;gap:3px;margin:10px 0 12px;font-size:15px}
+.digest .line{display:flex;flex-wrap:wrap;gap:2px 18px}
+.digest .muted{color:var(--muted)}
+.adj{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-start;margin:16px 0 4px}
+.adjtitle{flex:1 1 100%;margin:0;font-size:13px;font-weight:700;color:var(--muted)}
+.adj .field input.mins{width:6em;font-weight:700}
+.unit{align-self:center;color:var(--muted);font-size:14px}
+.day.reviewed{padding:14px 22px;margin:10px 0}
+.day.reviewed h2{font-size:20px}
+.day.reviewed .tl,.day.reviewed .fields,.day.reviewed .adj,.day.reviewed .vol,.day.reviewed .dayactions{display:none}
+.day.reviewed .digest{display:flex}
+.day.reviewed .tile:not(.on){display:none}
+.day.reviewed .grid{grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
+.day.reviewed .ttime{font-size:11px;padding:10px 5px 3px}
+.day.reviewed .zoom,.day.reviewed .flag,.day.reviewed .dupe{display:none}
+.day.reviewed.empty{padding:6px 22px;margin:4px 0;background:transparent}
+.day.reviewed.empty .digest,.day.reviewed.empty .grid{display:none}
+.day.reviewed.empty h2{font-size:16px;font-weight:600;color:var(--muted)}
+.day.reviewed.empty .meta{font-size:13px}
+.dayhead .meta{color:var(--muted);font-size:15px}
+.tl{position:relative;height:56px;margin:14px 0 18px}
+.tl .axis{position:absolute;left:0;right:0;top:34px;border-top:1px solid var(--line)}
+.tl .band{position:absolute;top:2px;height:32px;background:var(--mark-soft);border-left:3px solid var(--mark);border-right:3px solid var(--mark);min-width:3px}
+.tl .tick{position:absolute;top:12px;width:2px;height:22px;margin-left:-1px;background:var(--accent);border-radius:1px}
+.tl .tick.off{background:var(--muted);opacity:.4;top:24px;height:10px}
+.tl .hr{position:absolute;top:38px;font-size:12px;color:var(--muted);transform:translateX(-50%);white-space:nowrap}
+.tl .hr.first{transform:none}.tl .hr.last{transform:translateX(-100%)}
+.fields{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-start}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field label{font-size:13px;color:var(--muted);font-weight:700}
+.field .row{display:flex;gap:6px}
+.field input{font-weight:700;font-size:17px;font-variant-numeric:tabular-nums;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--field);width:14.5em;max-width:100%}
+.field.hours input{width:5.5em}
+.field .hm{font-size:13px;color:var(--muted);margin-left:2px;min-height:1.2em}
+.dayactions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 18px}
+
+/* Tiles */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:8px}
+.tile{position:relative;aspect-ratio:1;border-radius:7px;overflow:hidden;background:var(--tile)}
+.tile.loading{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.55}}
+.pick{all:unset;box-sizing:border-box;display:block;width:100%;height:100%;cursor:pointer;position:relative}
+.pick img{width:100%;height:100%;object-fit:cover;display:block}
+.pick img:not([src]){visibility:hidden}
+.o3 img{transform:rotate(180deg)}.o6 img{transform:rotate(90deg)}.o8 img{transform:rotate(-90deg)}
+.tile:not(.on) img{opacity:.35;filter:grayscale(1)}
+.tile.on::after{content:"";position:absolute;inset:0;border:3px solid var(--accent);border-radius:7px;pointer-events:none}
+.pick:focus-visible{outline:3px solid var(--mark);outline-offset:-3px}
+.check{position:absolute;top:7px;left:7px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.3)}
+.tile.on .check{background:var(--accent);border-color:var(--accent)}
+.tile.on .check::after{content:"";position:absolute;left:6px;top:2px;width:6px;height:11px;border:solid var(--accent-ink);border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.ttime{position:absolute;left:0;right:0;bottom:0;padding:16px 8px 5px;color:#fff;font-weight:700;font-size:13px;background:linear-gradient(transparent,rgba(0,0,0,.72))}
+.dupe{position:absolute;top:8px;left:36px;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px}
+.flag{position:absolute;left:7px;bottom:26px;background:var(--mark);color:#2A1E00;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px}
+.ph{display:none;position:absolute;inset:0;align-items:center;justify-content:center;text-align:center;padding:10px 8px 28px;font-size:12px;color:var(--muted)}
+.noprev .ph{display:flex}.noprev img{display:none}
+.zoom{position:absolute;top:6px;right:6px;width:30px;height:30px;border-radius:50%;border:0;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center;cursor:pointer}
+.zoom:focus-visible{outline:3px solid var(--mark);outline-offset:1px}
+.empty-filter{padding:40px 0;color:var(--muted)}
+.btn.toggle{display:inline-flex;align-items:center;gap:8px}
+.btn.toggle::before{content:"";width:16px;height:16px;border-radius:4px;border:2px solid var(--muted);flex:none}
+.btn.toggle[aria-pressed="true"]{background:var(--mark-soft);border-color:var(--mark)}
+.btn.toggle[aria-pressed="true"]::before{background:var(--mark);border-color:var(--mark);box-shadow:inset 0 0 0 2px var(--surface)}
+
+/* Report */
+#report{max-width:min(1180px,96vw)}
+.rep{padding:22px 24px 26px;max-height:88vh;overflow:auto}
+.rephead{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.rephead h2{font-size:26px}
+.rep .lead{margin:6px 0 16px;color:var(--muted);max-width:70ch}
+.repactions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.repnote{min-height:1.5em;margin:4px 0 12px;color:var(--muted);font-size:14px}
+.reptable{overflow-x:auto}
+.rep table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.rep th{text-align:left;font-size:13px;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+.rep td{padding:9px 10px;border-top:1px solid var(--line);vertical-align:top;white-space:nowrap}
+.rep td.num,.rep th.num{text-align:right}
+.rep tr.files td{border-top:0;padding-top:0;white-space:normal}
+.rep details summary{cursor:pointer;color:var(--accent);font-weight:700;font-size:14px}
+.rep details ul{margin:8px 0 4px;padding-left:18px;font-size:14px;columns:2 22em}
+.rep details li{break-inside:avoid;margin-bottom:2px;word-break:break-all}
+.rep details li span{color:var(--muted);margin-right:6px}
+.rep tfoot td{border-top:2px solid var(--line);font-weight:700}
+.rep .empty{padding:24px 0;color:var(--muted)}
+.repsave{border-top:1px solid var(--line);margin-top:24px;padding-top:18px}
+.repsave h3{font-family:var(--display);font-size:19px;margin:0 0 4px}
+.repsave p{margin:0 0 12px;color:var(--muted);max-width:70ch}
+#saveStat{color:var(--muted)}
+#saveStat.err{color:#C2410C;font-weight:700}
+.resume{margin:16px 0 0;padding:12px 14px;border-radius:10px;background:var(--mark-soft);border:1px solid var(--mark);text-align:left;font-size:15px}
+
+/* Viewer */
+dialog{border:0;border-radius:14px;padding:0;background:var(--surface);color:var(--ink);max-width:min(1000px,94vw);width:100%}
+dialog::backdrop{background:rgba(8,12,18,.82)}
+.vimg{background:#000;display:grid;place-items:center;min-height:240px}
+.vimg img{max-width:100%;max-height:70vh;display:block}
+.vimg p{color:#ccd;padding:40px 20px;text-align:center;margin:0}
+.vbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 16px}
+.vbar .cap{margin-right:auto;min-width:0}
+.vbar .cap strong{display:block}
+.vbar .cap span{color:var(--muted);font-size:14px;word-break:break-all}
+
+/* Volunteer details */
+.vol{display:grid;grid-template-columns:minmax(200px,1fr) minmax(190px,auto) minmax(260px,1.6fr);gap:14px 20px;margin:4px 0 16px;padding-top:16px;border-top:1px solid var(--line)}
+.vol textarea{font:15px/1.45 var(--body);padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink);resize:vertical;width:100%;min-height:6.4em}
+.vol textarea:focus-visible,.vol input:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.volnums{display:flex;flex-direction:column;gap:12px}
+.vol .field input.count{width:6em;font-weight:700}
+.hint{font-size:13px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{font:700 13px var(--body);padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.chip::before{content:"+ ";color:var(--accent)}
+.chip:focus-visible{outline:3px solid var(--mark);outline-offset:1px}
+.rep td.multi{white-space:pre-line;min-width:8em}
+.rep td.acts{white-space:pre-line;min-width:16em}
+.rep h3.sub{font-family:var(--display);font-size:19px;margin:26px 0 6px}
+.rep .warn{margin:0 0 12px;padding:10px 12px;border-radius:8px;background:var(--mark-soft);font-size:14px}
+
+@media (max-width:760px){
+  .vol{grid-template-columns:1fr}
+  .intro{grid-template-columns:1fr;margin:24px 0 40px}
+  .bar{position:static}
+  .day{padding:16px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+  .field{flex:1 1 100%}
+  .field input{width:100%}
+  .field.hours{flex:1 1 auto}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="bar" id="bar" hidden>
+  <div class="wrap">
+    <div class="summary" aria-live="polite">
+      <strong id="sumMain"></strong>
+      <span id="sumSub"></span>
+      <span id="sumSrc"></span>
+      <span id="thumbStat"></span>
+      <span id="saveStat"></span>
+    </div>
+    <label class="ctl">From<input type="date" id="from"></label>
+    <label class="ctl">To<input type="date" id="to"></label>
+    <label class="ctl">Order
+      <select id="order"><option value="desc">Newest first</option><option value="asc">Oldest first</option></select>
+    </label>
+    <button class="btn toggle" id="onlySel" type="button" aria-pressed="false">Only days with selections</button>
+    <label class="ctl">Round times
+      <select id="round">
+        <option value="0">Exact</option>
+        <option value="5">Nearest 5 min</option>
+        <option value="15">Nearest 15 min</option>
+      </select>
+    </label>
+    <label class="ctl">Time format
+      <select id="format">
+        <option value="us">9/12/2026 8:14 AM</option>
+        <option value="time">8:14 AM</option>
+        <option value="iso">2026-09-12 08:14</option>
+      </select>
+    </label>
+    <div class="actions">
+      <button class="btn primary" id="copyAll" type="button" title="Copies every day shown with selected photos, in your volunteer tracking sheet’s column order, ready to paste">Copy all days</button>
+      <button class="btn" id="openReport" type="button">Report</button>
+      <button class="btn" id="addMore" type="button">Add photos</button>
+      <button class="btn" id="clear" type="button">Clear</button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <header class="top"><h1>Volunteer photo hours</h1></header>
+
+  <section class="intro" id="intro">
+    <div>
+      <h2>Turn a day of photos into logged hours</h2>
+      <p>Load your photo backup. Each day gets its own group, and nothing is selected to start. Click the photos from your volunteer work, and the first and last one you pick become your start and end times. Add who volunteered and what was done, then copy the rows into your tracking sheet or download the full report.</p>
+      <div class="demo" aria-hidden="true">
+        <div class="tl">
+          <div class="axis"></div>
+          <div class="band" style="left:14%;width:58%"></div>
+          <div class="tick" style="left:14%"></div><div class="tick" style="left:21%"></div><div class="tick" style="left:30%"></div>
+          <div class="tick" style="left:33%"></div><div class="tick" style="left:47%"></div><div class="tick" style="left:61%"></div>
+          <div class="tick" style="left:72%"></div><div class="tick off" style="left:90%"></div>
+          <span class="hr first" style="left:0">7 AM</span><span class="hr" style="left:50%">12 PM</span><span class="hr last" style="left:100%">5 PM</span>
+        </div>
+      </div>
+    </div>
+    <div class="drop" id="drop">
+      <strong>Drop a folder or photos here</strong>
+      <div class="btns">
+        <button class="btn primary" type="button" id="pickFolder">Choose a folder</button>
+        <button class="btn" type="button" id="pickFiles">Choose photos</button>
+      </div>
+      <small>Photos are read in your browser and never uploaded.</small>
+      <small>Thousands of photos are fine. Previews load as you scroll.</small>
+      <p class="resume" id="resume" hidden></p>
+    </div>
+  </section>
+
+  <section class="progress" id="progress" hidden aria-live="polite">
+    <h2 id="progTitle">Reading photo dates</h2>
+    <div class="meter"><i id="meter"></i></div>
+    <p id="progText"></p>
+    <p><button class="btn small" type="button" id="stopRead">Stop and show what’s read so far</button></p>
+  </section>
+
+  <p class="note" id="note" hidden></p>
+  <div id="days"></div>
+</main>
+
+<input type="file" id="folderInput" webkitdirectory multiple class="sr" tabindex="-1" aria-hidden="true">
+<input type="file" id="restoreInput" accept=".json,application/json" class="sr" tabindex="-1" aria-hidden="true">
+<input type="file" id="fileInput" accept="image/*,.heic,.heif" multiple class="sr" tabindex="-1" aria-hidden="true">
+
+<dialog id="viewer" aria-label="Photo viewer">
+  <div class="vimg"><img id="vImg" alt=""><p id="vMsg" hidden></p></div>
+  <div class="vbar">
+    <div class="cap"><strong id="vTime"></strong><span id="vName"></span></div>
+    <button class="btn" type="button" id="vPrev">Previous</button>
+    <button class="btn primary" type="button" id="vToggle"></button>
+    <button class="btn" type="button" id="vNext">Next</button>
+    <button class="btn" type="button" id="vClose">Close</button>
+  </div>
+</dialog>
+
+<dialog id="report" aria-labelledby="repTitle">
+  <div class="rep">
+    <div class="rephead"><h2 id="repTitle">Volunteer report</h2><button class="btn small" type="button" id="repClose">Close</button></div>
+    <p class="lead" id="repLead"></p>
+    <div class="repactions">
+      <button class="btn primary" type="button" id="dlLog">Download volunteer log (CSV)</button>
+      <button class="btn" type="button" id="copyLog" title="Rows only, no header, in your tracking sheet’s column order">Copy log rows for spreadsheet</button>
+      <button class="btn" type="button" id="dlPeople">Download hours by volunteer (CSV)</button>
+      <button class="btn" type="button" id="dlPhotos">Download photo list (CSV)</button>
+    </div>
+    <p class="repnote" id="repNote" aria-live="polite"></p>
+    <div class="reptable" id="repBody"></div>
+    <section class="repsave" aria-labelledby="saveTitle">
+      <h3 id="saveTitle">Saved progress</h3>
+      <p id="saveInfo"></p>
+      <div class="repactions">
+        <button class="btn" type="button" id="dlBackup">Download backup</button>
+        <button class="btn" type="button" id="restoreBtn">Restore from backup</button>
+        <button class="btn" type="button" id="forgetBtn">Forget photo selections</button>
+      </div>
+      <p class="repnote" id="saveNote" aria-live="polite"></p>
+    </section>
+  </div>
+</dialog>
+
+<template id="tileTpl">
+  <div class="tile">
+    <button class="pick" type="button" aria-pressed="false">
+      <img alt="" decoding="async">
+      <span class="ph">No preview for this file type</span>
+      <span class="check" aria-hidden="true"></span>
+      <span class="ttime"></span>
+    </button>
+    <button class="zoom" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg></button>
+  </div>
+</template>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+function h(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat()) { if (c == null) continue; e.append(c.nodeType ? c : document.createTextNode(c)); }
+  return e;
+}
+
+// Loaded photos live on window.VPH, so a hot reload of this app keeps them
+// in memory instead of reading thousands of files again.
+const shared = window.VPH || (window.VPH = { photos: [], seen: new Set(), nextId: 1, thumbCache: new Map() });
+if (!shared.thumbCache) shared.thumbCache = new Map();
+const life = new AbortController();            // removes page-wide listeners on hot reload
+const onLife = { signal: life.signal };
+const state = { photos: shared.photos, seen: shared.seen, days: [], format: 'us', order: 'desc', reading: false, stop: false };
+const IMG_EXT = /\.(jpe?g|png|heic|heif|webp|gif|tiff?|avif|dng)$/i;
+const nf = new Intl.NumberFormat();
+
+/* ================= Formatting ================= */
+const pad = n => String(n).padStart(2, '0');
+const t12 = d => { let hh = d.getHours(); const ap = hh < 12 ? 'AM' : 'PM'; hh = hh % 12 || 12; return `${hh}:${pad(d.getMinutes())} ${ap}`; };
+const dUS = d => `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+const dISO = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function fmtStamp(d) {
+  if (state.format === 'time') return t12(d);
+  if (state.format === 'iso') return `${dISO(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${dUS(d)} ${t12(d)}`;
+}
+const fmtDate = d => state.format === 'iso' ? dISO(d) : dUS(d);
+const hoursDec = ms => (ms / 3600000).toFixed(2);
+const hm = ms => { const m = Math.round(ms / 60000); return `${Math.floor(m / 60)}h ${pad(m % 60)}m`; };
+const longDate = d => d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+const isoLocal = d => `${dISO(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+const hourLabel = x => `${x % 12 || 12} ${x < 12 || x === 24 ? 'AM' : 'PM'}`;
+
+/* ================= Built-in date reader =================
+   Reads only the first part of each file (camera info lives near the start),
+   so no photo is ever fully loaded just to find its date. */
+const HEAD_BYTES = 256 * 1024;
+
+function makeDate(y, mo, d, hh, mi, ss) {
+  if (y < 1990 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31 || hh > 23 || mi > 59 || ss > 59) return null;
+  const dt = new Date(y, mo - 1, d, hh, mi, ss);
+  return isNaN(dt) ? null : dt;
+}
+function parseExifString(s) {
+  const m = /^\s*(\d{4})[:\-](\d{2})[:\-](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/.exec(s || '');
+  return m ? makeDate(+m[1], +m[2], +m[3], +m[4], +m[5], +(m[6] || 0)) : null;
+}
+function ascii(dv, off, len) {
+  let s = '';
+  for (let i = 0; i < len && off + i < dv.byteLength; i++) { const c = dv.getUint8(off + i); if (!c) break; s += String.fromCharCode(c); }
+  return s;
+}
+const fourcc = (dv, o) => String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3));
+
+// TIFF/EXIF block starting at offset t in dv. base = file offset of dv's first byte.
+function parseTIFF(dv, t, base, out) {
+  const bo = dv.getUint16(t);
+  const le = bo === 0x4949;
+  if (!le && bo !== 0x4D4D) return;
+  const u16 = o => dv.getUint16(t + o, le), u32 = o => dv.getUint32(t + o, le);
+  if (u16(2) !== 42) return;
+  const ifd = off => {
+    const n = u16(off);
+    if (n > 500) throw new Error('bad ifd');
+    const tags = new Map();
+    for (let i = 0; i < n; i++) { const e = off + 2 + i * 12; tags.set(u16(e), { cnt: u32(e + 4), v: e + 8 }); }
+    let next = 0; try { next = u32(off + 2 + n * 12); } catch (e) {}
+    return { tags, next };
+  };
+  const str = tg => { if (!tg) return null; const off = tg.cnt <= 4 ? tg.v : u32(tg.v); return ascii(dv, t + off, Math.min(tg.cnt, 40)); };
+  const d0 = ifd(u32(4));
+  const ot = d0.tags.get(0x0112); if (ot) out.orientation = u16(ot.v);
+  const candidates = [];
+  const ex = d0.tags.get(0x8769);
+  if (ex) { try { const d = ifd(u32(ex.v)); candidates.push(str(d.tags.get(0x9003)), str(d.tags.get(0x9004))); } catch (e) {} }
+  candidates.push(str(d0.tags.get(0x0132)));
+  for (const s of candidates) { const d = parseExifString(s); if (d) { out.date = d; out.source = 'camera'; break; } }
+  if (d0.next) {
+    try {
+      const d1 = ifd(d0.next);
+      const a = d1.tags.get(0x0201), b = d1.tags.get(0x0202);
+      if (a && b) { const off = u32(a.v), len = u32(b.v); if (len > 200 && len < 2e6) out.thumb = { start: base + t + off, len }; }
+    } catch (e) {}
+  }
+}
+
+function parseJPEG(dv, out) {
+  let o = 2;
+  while (o + 10 < dv.byteLength) {
+    if (dv.getUint8(o) !== 0xFF) return;
+    const m = dv.getUint8(o + 1);
+    if (m === 0xFF) { o++; continue; }
+    if (m === 0xD8 || m === 0x01 || (m >= 0xD0 && m <= 0xD7)) { o += 2; continue; }
+    if (m === 0xDA || m === 0xD9) return;
+    const len = dv.getUint16(o + 2);
+    if (m === 0xE1 && dv.getUint32(o + 4) === 0x45786966 && dv.getUint16(o + 8) === 0) {
+      try { parseTIFF(dv, o + 10, 0, out); } catch (e) {}
+      if (out.date) return;
+    }
+    o += 2 + len;
+  }
+}
+
+function parsePNG(dv, out) {
+  let o = 8;
+  while (o + 12 <= dv.byteLength) {
+    const len = dv.getUint32(o), type = fourcc(dv, o + 4);
+    if (type === 'eXIf') { try { parseTIFF(dv, o + 8, 0, out); } catch (e) {} return; }
+    if (type === 'IEND') return;
+    o += 12 + len;
+  }
+}
+
+function parseWebP(dv, out) {
+  let o = 12;
+  while (o + 8 <= dv.byteLength) {
+    const type = fourcc(dv, o), len = dv.getUint32(o + 4, true);
+    if (type === 'EXIF') {
+      let t = o + 8;
+      if (fourcc(dv, t) === 'Exif') t += 6;
+      try { parseTIFF(dv, t, 0, out); } catch (e) {}
+      return;
+    }
+    o += 8 + len + (len & 1);
+  }
+}
+
+// HEIC / HEIF (iPhone and many Android phones)
+async function parseHEIF(file, dv, out) {
+  const readN = (v, o, n) => n === 0 ? 0 : n === 4 ? v.getUint32(o) : n === 8 ? Number(v.getBigUint64(o)) : n === 2 ? v.getUint16(o) : 0;
+  const children = (v, start, end) => {
+    const list = []; let o = start;
+    while (o + 8 <= end) {
+      let size = v.getUint32(o), hdr = 8;
+      const type = fourcc(v, o + 4);
+      if (size === 1) { size = Number(v.getBigUint64(o + 8)); hdr = 16; } else if (size === 0) size = end - o;
+      if (size < hdr) break;
+      list.push({ type, start: o, hdr, size });
+      o += size;
+    }
+    return list;
+  };
+  const top = children(dv, 0, dv.byteLength);
+  const meta = top.find(b => b.type === 'meta');
+  if (!meta) return;
+  let mv = dv, mo = meta.start;
+  if (meta.start + meta.size > dv.byteLength) {
+    if (meta.size > 8e6) return;
+    mv = new DataView(await file.slice(meta.start, meta.start + meta.size).arrayBuffer());
+    mo = 0;
+  }
+  const kids = children(mv, mo + meta.hdr + 4, mo + meta.size);
+  const iinf = kids.find(b => b.type === 'iinf'), iloc = kids.find(b => b.type === 'iloc');
+  if (!iinf || !iloc) return;
+
+  let p = iinf.start + iinf.hdr;
+  const iv = mv.getUint8(p); p += 4; p += iv === 0 ? 2 : 4;
+  let exifId = null;
+  for (const b of children(mv, p, iinf.start + iinf.size)) {
+    if (b.type !== 'infe') continue;
+    let q = b.start + b.hdr; const v = mv.getUint8(q); q += 4;
+    if (v < 2) continue;
+    const id = v === 2 ? mv.getUint16(q) : mv.getUint32(q); q += v === 2 ? 2 : 4;
+    q += 2;
+    if (fourcc(mv, q) === 'Exif') { exifId = id; break; }
+  }
+  if (exifId == null) return;
+
+  p = iloc.start + iloc.hdr;
+  const v = mv.getUint8(p); p += 4;
+  const b1 = mv.getUint8(p), b2 = mv.getUint8(p + 1); p += 2;
+  const offSize = b1 >> 4, lenSize = b1 & 15, baseSize = b2 >> 4, idxSize = (v === 1 || v === 2) ? (b2 & 15) : 0;
+  const count = v < 2 ? mv.getUint16(p) : mv.getUint32(p); p += v < 2 ? 2 : 4;
+  for (let i = 0; i < count; i++) {
+    const id = v < 2 ? mv.getUint16(p) : mv.getUint32(p); p += v < 2 ? 2 : 4;
+    let method = 0;
+    if (v === 1 || v === 2) { method = mv.getUint16(p) & 15; p += 2; }
+    p += 2;
+    const baseOff = readN(mv, p, baseSize); p += baseSize;
+    const ext = mv.getUint16(p); p += 2;
+    let first = null;
+    for (let e = 0; e < ext; e++) {
+      p += idxSize;
+      const eo = readN(mv, p, offSize); p += offSize;
+      const el = readN(mv, p, lenSize); p += lenSize;
+      if (!first) first = { off: baseOff + eo, len: el };
+    }
+    if (id === exifId) {
+      if (method !== 0 || !first || !first.len) return;
+      const len = Math.min(first.len, HEAD_BYTES);
+      const ev = new DataView(await file.slice(first.off, first.off + len).arrayBuffer());
+      let t = 4 + ev.getUint32(0);
+      if (t + 8 > ev.byteLength) t = 4;
+      if (fourcc(ev, t) === 'Exif') t += 6;
+      try { parseTIFF(ev, t, first.off, out); } catch (e) {}
+      out.thumb = null; // HEIC previews can't be shown by most browsers
+      return;
+    }
+  }
+}
+
+let latin1;
+function scanXMP(dv, out) {
+  try {
+    latin1 = latin1 || new TextDecoder('iso-8859-1');
+    const text = latin1.decode(new Uint8Array(dv.buffer, dv.byteOffset, Math.min(dv.byteLength, HEAD_BYTES)));
+    const m = /(?:exif:DateTimeOriginal|xmp:CreateDate|photoshop:DateCreated)\s*(?:=\s*["']|>)\s*(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(text);
+    if (m) { const d = makeDate(+m[1], +m[2], +m[3], +m[4], +m[5], +(m[6] || 0)); if (d) { out.date = d; out.source = 'camera'; } }
+  } catch (e) {}
+}
+
+// Phone file names such as IMG_20260629_195312.jpg, PXL_20260629_195312345.jpg,
+// Screenshot_2026-06-29-19-53-12.png or "2026-06-29 19.53.12.jpg"
+function dateFromName(name) {
+  const m = /(?:^|\D)((?:19|20)\d{2})[-_.]?(\d{2})[-_.]?(\d{2})[-_ T.]?(\d{2})[-_.:h]?(\d{2})[-_.:m]?(\d{2})(?!\d{3,})/.exec(name);
+  return m ? makeDate(+m[1], +m[2], +m[3], +m[4], +m[5], +m[6]) : null;
+}
+
+async function readMeta(file) {
+  const out = { date: null, source: 'file', orientation: 1, thumb: null };
+  try {
+    const dv = new DataView(await file.slice(0, HEAD_BYTES).arrayBuffer());
+    if (dv.byteLength >= 12) {
+      const sig = dv.getUint32(0);
+      if ((sig >>> 16) === 0xFFD8) parseJPEG(dv, out);
+      else if (sig === 0x89504E47) parsePNG(dv, out);
+      else if (sig === 0x52494646 && fourcc(dv, 8) === 'WEBP') parseWebP(dv, out);
+      else if (fourcc(dv, 4) === 'ftyp') await parseHEIF(file, dv, out);
+      else if (sig === 0x49492A00 || sig === 0x4D4D002A) { try { parseTIFF(dv, 0, 0, out); } catch (e) {} }
+      if (!out.date) scanXMP(dv, out);
+    }
+  } catch (e) {}
+  if (!out.date) { const d = dateFromName(file.name); if (d) { out.date = d; out.source = 'name'; } }
+  if (!out.date) { out.date = new Date(file.lastModified); out.source = 'file'; }
+  return out;
+}
+
+/* ================= Saved progress (storage) =================
+   Everything is saved in this browser (localStorage). When the page is served
+   by the included nginx setup, it is also written to a file on disk,
+   data/volunteer-data.json, with one dated copy per day in data/backups/. */
+const STORE_KEY = 'volunteer-photo-hours:v2';   // same key since v2; the data inside carries its version
+const OLD_KEY = 'volunteer-photo-hours:v1';
+const SERVER_FILE = 'data/volunteer-data.json';
+const saved = { sel: new Set(), info: new Map(), days: {}, ok: true, savedAt: '' };
+const server = { mode: 'off', ready: false };   // off | probing | on | failed
+const photoKey = p => `${p.name}|${p.file.size}`;
+state.round = 0;
+let saveTimer = 0, serverTimer = 0;
+
+/* Saved data, version 3
+   selected   keys ("file name|size") of selected photos, including duplicate copies
+   photoInfo  per selected photo: t = time taken (local), p = path, c = key of the
+              original when this file is a duplicate copy
+   days       per date: names, count (null = count the names), notes, reviewed,
+              adjust (minutes: before first photo, after last photo, travel),
+              and calc, the photo-based times, written for your records only. */
+const dayInfo = key => saved.days[key] || null;
+const ensureDay = key => saved.days[key] || (saved.days[key] = { names: [], count: null, notes: '', reviewed: false, adjust: { before: 0, after: 0, travel: 0 } });
+const clampMin = v => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(-1440, Math.min(1440, n)) : 0; };
+function adjOf(key) {
+  const a = (dayInfo(key) || {}).adjust || {};
+  return { before: clampMin(a.before || 0), after: clampMin(a.after || 0), travel: clampMin(a.travel || 0) };
+}
+function cleanDays(obj) {
+  const out = {};
+  if (!obj || typeof obj !== 'object') return out;
+  for (const [k, v] of Object.entries(obj)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(k) || !v || typeof v !== 'object') continue;
+    const names = Array.isArray(v.names) ? v.names.filter(n => typeof n === 'string').map(n => n.trim()).filter(Boolean).slice(0, 500) : [];
+    const count = Number.isInteger(v.count) && v.count >= 0 ? v.count : null;
+    const notes = typeof v.notes === 'string' ? v.notes : '';
+    const reviewed = v.reviewed === true;
+    const a = v.adjust && typeof v.adjust === 'object' ? v.adjust : {};
+    const adjust = { before: clampMin(a.before || 0), after: clampMin(a.after || 0), travel: clampMin(a.travel || 0) };
+    const hasAdj = adjust.before || adjust.after || adjust.travel;
+    if (names.length || count != null || notes.trim() || reviewed || hasAdj) out[k] = { names, count, notes, reviewed, adjust };
+  }
+  return out;
+}
+function recordInfo(p) {
+  const main = p.dupOf;
+  const rec = { t: isoLocal(p.date), p: p.path };
+  if (main) rec.c = photoKey(main);
+  saved.info.set(photoKey(p), rec);
+}
+// Selected photos grouped by day, from saved data (works without photos loaded)
+function savedPhotoDays() {
+  const days = new Map(), copies = new Map();
+  let missing = 0;
+  for (const k of saved.sel) {
+    const i = saved.info.get(k);
+    if (!i || typeof i.t !== 'string') { missing++; continue; }
+    if (i.c) { const a = copies.get(i.c); if (a) a.push(i.p); else copies.set(i.c, [i.p]); continue; }
+    const key = i.t.slice(0, 10);
+    const a = days.get(key); const rec = { key: k, t: new Date(i.t), path: i.p };
+    if (a) a.push(rec); else days.set(key, [rec]);
+  }
+  for (const a of days.values()) a.sort((x, y) => x.t - y.t);
+  return { days, copies, missing };
+}
+function snapshot() {
+  const photoInfo = {};
+  for (const k of saved.sel) { const i = saved.info.get(k); if (i) photoInfo[k] = i; }
+  const days = cleanDays(saved.days);
+  for (const [key, list] of savedPhotoDays().days) {
+    const s = list[0].t, e = list[list.length - 1].t;
+    const d = days[key] || (days[key] = { names: [], count: null, notes: '', reviewed: false, adjust: { before: 0, after: 0, travel: 0 } });
+    d.calc = { firstPhoto: isoLocal(s), lastPhoto: isoLocal(e), photoMinutes: Math.round((e - s) / 60000), photos: list.length };
+  }
+  return {
+    app: 'volunteer-photo-hours', version: 3, savedAt: saved.savedAt || new Date().toISOString(),
+    selected: [...saved.sel], photoInfo, days,
+    settings: { format: state.format, order: state.order, round: state.round, onlySel: !!state.onlySel, from: $('#from').value, to: $('#to').value }
+  };
+}
+function applySettings(st) {
+  if (!st || typeof st !== 'object') return;
+  if (['us', 'time', 'iso'].includes(st.format)) { state.format = st.format; $('#format').value = st.format; }
+  if (['asc', 'desc'].includes(st.order)) { state.order = st.order; $('#order').value = st.order; }
+  if ([0, 5, 15].includes(st.round)) { state.round = st.round; $('#round').value = String(st.round); }
+  state.onlySel = st.onlySel === true; $('#onlySel').setAttribute('aria-pressed', String(state.onlySel));
+  if (typeof st.from === 'string') $('#from').value = st.from;
+  if (typeof st.to === 'string') $('#to').value = st.to;
+}
+function applySnapshot(d) {
+  saved.sel = new Set(Array.isArray(d.selected) ? d.selected.filter(k => typeof k === 'string') : []);
+  saved.info = new Map();
+  if (d.photoInfo && typeof d.photoInfo === 'object')
+    for (const [k, v] of Object.entries(d.photoInfo)) if (v && typeof v.t === 'string' && typeof v.p === 'string') saved.info.set(k, { t: v.t, p: v.p, ...(typeof v.c === 'string' ? { c: v.c } : {}) });
+  saved.days = cleanDays(d.days);
+  saved.savedAt = typeof d.savedAt === 'string' ? d.savedAt : '';
+  applySettings(d.settings);
+}
+function loadLocal() {
+  let raw = null;
+  try { raw = localStorage.getItem(STORE_KEY) || localStorage.getItem(OLD_KEY); } catch (e) { saved.ok = false; return; }
+  if (!raw) return;
+  try { applySnapshot(JSON.parse(raw)); }
+  catch (e) { try { localStorage.setItem(STORE_KEY + ':unreadable-' + Date.now(), raw); } catch (e2) {} }
+}
+function writeLocal() {
+  saveTimer = 0;
+  saved.savedAt = new Date().toISOString();
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot())); saved.ok = true; } catch (e) { saved.ok = false; }
+  scheduleServer();
+  updateSaveStat();
+}
+function persist() { clearTimeout(saveTimer); saveTimer = setTimeout(writeLocal, 300); }
+function flushSave(force) {
+  if (saveTimer || force === true) { clearTimeout(saveTimer); writeLocal(); }
+  if (serverTimer) { clearTimeout(serverTimer); writeServer(true); }
+}
+
+// ---- data file on disk (only when served by the included nginx setup) ----
+const canUseServer = () => /^https?:$/.test(location.protocol) && !window.claude;
+async function initServer() {
+  if (!canUseServer()) { server.ready = true; updateSaveStat(); return; }
+  server.mode = 'probing';
+  let pushLocal = true;
+  try {
+    const r = await fetch(SERVER_FILE, { cache: 'no-store' });
+    if (r.ok) {
+      const d = await r.json();
+      server.mode = 'on';
+      if (d && d.app === 'volunteer-photo-hours') {
+        if (!saved.savedAt || (d.savedAt || '') >= saved.savedAt) {
+          applySnapshot(d);                       // the file on disk is newer than this browser's copy
+          try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot())); } catch (e) {}
+          pushLocal = false;
+          afterExternalLoad();
+        }
+      }
+    } else if (r.status !== 404) server.mode = 'off';
+  } catch (e) { server.mode = 'off'; }
+  server.ready = true;
+  updateSaveStat();
+  if (pushLocal && server.mode !== 'off' && (saved.savedAt || server.mode === 'probing')) writeServer(false);
+}
+function scheduleServer() {
+  if (!server.ready || server.mode === 'off') return;
+  clearTimeout(serverTimer);
+  serverTimer = setTimeout(() => writeServer(false), 1200);
+}
+async function writeServer(leaving) {
+  serverTimer = 0;
+  if (!server.ready || server.mode === 'off') return;
+  const body = JSON.stringify(snapshot(), null, 1);
+  const put = url => fetch(url, { method: 'PUT', body, headers: { 'Content-Type': 'application/json' }, keepalive: !!leaving && body.length < 60000 });
+  try {
+    const r = await put(SERVER_FILE);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    server.mode = 'on';
+    put(`data/backups/volunteer-data-${dISO(new Date())}.json`).catch(() => {});
+  } catch (e) {
+    server.mode = server.mode === 'probing' ? 'off' : 'failed';
+  }
+  updateSaveStat();
+}
+function afterExternalLoad() {
+  for (const p of state.photos) p.selected = false;
+  for (const p of state.photos) if (saved.sel.has(photoKey(p))) (p.dupOf || p).selected = true;
+  if (state.photos.length) rebuild();
+  showResume();
+}
+function updateSaveStat() {
+  const el = $('#saveStat');
+  let text, err = false;
+  if (server.mode === 'on') text = 'Saved to the data file on this computer';
+  else if (server.mode === 'failed') { text = 'Couldn’t write the data file. Changes are still saved in this browser.'; err = true; }
+  else if (!saved.ok) { text = 'Can’t save in this browser. Open Report and download a backup before closing.'; err = true; }
+  else text = 'Saved in this browser only';
+  el.textContent = text;
+  el.classList.toggle('err', err);
+}
+
+/* ================= Duplicate detection =================
+   Identical copies must have the same file size, so only files that share a
+   size with another file are checked. Those get a quick fingerprint of their
+   first 64 KB, and only files whose fingerprints match are fully hashed
+   (SHA-256). Files with the same full hash are grouped as one photo. */
+const HEAD_HASH_BYTES = 64 * 1024;
+const FULL_HASH_LIMIT = 300 * 1024 * 1024;
+const hasSubtle = !!(window.crypto && window.crypto.subtle && window.crypto.subtle.digest);
+const toHex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+function jsHash(bytes) {            // fallback when the browser's hashing is unavailable
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < bytes.length; i++) { const c = bytes[i]; h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 'j' + (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
+async function digest(buf) {
+  if (hasSubtle) { try { return toHex(await crypto.subtle.digest('SHA-256', buf)); } catch (e) {} }
+  return jsHash(new Uint8Array(buf));
+}
+async function hashPart(blob) { return digest(await blob.arrayBuffer()); }
+async function hashFull(file) {
+  if (file.size <= FULL_HASH_LIMIT) return hashPart(file);
+  // very large files: head + tail + size (photos are never this big in practice)
+  return 'x' + file.size + (await hashPart(file.slice(0, 4 << 20))) + (await hashPart(file.slice(file.size - (4 << 20))));
+}
+
+async function runPool(items, n, fn, onStep) {
+  let i = 0;
+  const worker = async () => { while (i < items.length && !state.stop) { const it = items[i++]; try { await fn(it); } catch (e) { it.hashFailed = true; } onStep(it); } };
+  await Promise.all(Array.from({ length: n }, worker));
+}
+
+async function findDuplicates() {
+  const bySize = new Map();
+  for (const p of state.photos) { const a = bySize.get(p.file.size); if (a) a.push(p); else bySize.set(p.file.size, [p]); }
+  const cands = [];
+  for (const a of bySize.values()) if (a.length > 1) for (const p of a) if (!p.headHash && !p.hashFailed) cands.push(p);
+
+  if (cands.length) {
+    state.stop = false;
+    $('#progress').hidden = false;
+    $('#progTitle').textContent = 'Checking for duplicate photos';
+    $('#stopRead').textContent = 'Skip the duplicate check';
+    let done = 0, last = 0;
+    const paint = force => {
+      const now = performance.now();
+      if (!force && now - last < 120) return; last = now;
+      $('#meter').style.width = (done / cands.length * 100) + '%';
+      $('#progText').textContent = `Comparing ${nf.format(done)} of ${nf.format(cands.length)} photos that share a file size with another photo`;
+    };
+    paint(true);
+    await runPool(cands, 4, async p => { p.headHash = await hashPart(p.file.slice(0, HEAD_HASH_BYTES)); }, () => { done++; paint(); });
+
+    const byHead = new Map();
+    for (const p of state.photos) if (p.headHash) { const k = p.file.size + ':' + p.headHash; const a = byHead.get(k); if (a) a.push(p); else byHead.set(k, [p]); }
+    const full = [];
+    for (const a of byHead.values()) if (a.length > 1) for (const p of a) if (!p.fullHash && !p.hashFailed) full.push(p);
+    if (full.length && !state.stop) {
+      const totalBytes = full.reduce((n, p) => n + p.file.size, 0);
+      let bytes = 0, doneFull = 0;
+      $('#progTitle').textContent = 'Confirming duplicate photos';
+      const paintFull = force => {
+        const now = performance.now();
+        if (!force && now - last < 120) return; last = now;
+        $('#meter').style.width = (bytes / totalBytes * 100) + '%';
+        $('#progText').textContent = `Fully comparing ${nf.format(doneFull)} of ${nf.format(full.length)} likely duplicates`;
+      };
+      paintFull(true);
+      await runPool(full, 2, async p => { p.fullHash = await hashFull(p.file); }, p => { bytes += p.file.size; doneFull++; paintFull(); });
+    }
+    $('#stopRead').textContent = 'Stop and show what’s read so far';
+    $('#progTitle').textContent = 'Reading photo dates';
+    $('#progress').hidden = true;
+  }
+  applyGroups();
+  const skipped = state.stop;
+  state.stop = false;
+  return skipped;
+}
+
+function applyGroups() {
+  for (const p of state.photos) { p.dupOf = null; p.copies = null; }
+  const byHash = new Map();
+  for (const p of state.photos) if (p.fullHash) { const k = p.file.size + ':' + p.fullHash; const a = byHash.get(k); if (a) a.push(p); else byHash.set(k, [p]); }
+  for (const a of byHash.values()) {
+    if (a.length < 2) continue;
+    a.sort((x, y) => x.id - y.id);
+    const main = a[0];
+    main.copies = a.slice(1);
+    for (const c of main.copies) { c.dupOf = main; releaseImg(c); }
+    const sel = a.some(x => x.selected);
+    for (const c of main.copies) c.selected = false;
+    main.selected = sel;
+    if (sel) setSel(main, true);
+  }
+  persist();
+}
+const uniquePhotos = () => state.photos.filter(p => !p.dupOf);
+const dupCount = () => state.photos.length - uniquePhotos().length;
+
+/* ================= Loading files ================= */
+const filePath = f => f.webkitRelativePath || f._path || f.name;
+function showNote(text) { $('#note').hidden = !text; $('#note').textContent = text || ''; }
+
+async function addFiles(list) {
+  if (state.reading) return;
+  const files = [...list].filter(f => !f.name.startsWith('._') && (IMG_EXT.test(f.name) || (f.type || '').startsWith('image/')));
+  const fresh = files.filter(f => {
+    const k = `${filePath(f)}|${f.size}|${f.lastModified}`;
+    if (state.seen.has(k)) return false;
+    state.seen.add(k); return true;
+  });
+  if (!fresh.length) { showNote(files.length ? 'Those photos are already loaded.' : 'No photos found there. Choose a folder with JPG, HEIC or PNG files.'); return; }
+  showNote('');
+  state.reading = true; state.stop = false;
+  $('#intro').hidden = true;
+  $('#progress').hidden = false;
+  const total = fresh.length, t0 = performance.now();
+  let i = 0, done = 0, lastPaint = 0;
+  const paint = () => {
+    $('#meter').style.width = (done / total * 100) + '%';
+    const secs = done > 20 ? Math.round((performance.now() - t0) / done * (total - done) / 1000) : null;
+    $('#progText').textContent = `${nf.format(done)} of ${nf.format(total)} photos` +
+      (secs != null ? `, about ${secs < 60 ? secs + ' seconds' : Math.ceil(secs / 60) + ' minutes'} left` : '');
+  };
+  paint();
+  const worker = async () => {
+    while (i < total && !state.stop) {
+      const f = fresh[i++];
+      const meta = await readMeta(f);
+      state.photos.push({ id: shared.nextId++, file: f, name: f.name, path: filePath(f), ...meta, selected: saved.sel.has(`${f.name}|${f.size}`), url: null, visible: false, tileEl: null });
+      done++;
+      const now = performance.now();
+      if (now - lastPaint > 120 || done === total) { lastPaint = now; paint(); }
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  const stoppedReading = state.stop;
+  if (state.stop) for (let j = i; j < total; j++) { const f = fresh[j]; state.seen.delete(`${filePath(f)}|${f.size}|${f.lastModified}`); }
+  $('#progress').hidden = true;
+  const newPhotos = state.photos.slice(-done);
+  const dupSkipped = await findDuplicates();
+  state.reading = false;
+  for (const p of newPhotos) if ((p.dupOf || p).selected) recordInfo(p);   // fill in times for saved selections
+  const restored = newPhotos.filter(p => !p.dupOf && p.selected).length;
+  const newDups = newPhotos.filter(p => p.dupOf).length;
+  if (stoppedReading && done < total) showNote(`Stopped after ${nf.format(done)} of ${nf.format(total)} photos. Choose Add photos with the same folder to read the rest.`);
+  if (newDups) showNote(($('#note').hidden ? '' : $('#note').textContent + ' ') + `Found ${nf.format(newDups)} duplicate ${newDups === 1 ? 'copy' : 'copies'} and grouped ${newDups === 1 ? 'it' : 'them'} with the original.`);
+  if (dupSkipped) showNote(($('#note').hidden ? '' : $('#note').textContent + ' ') + 'The duplicate check was skipped, so some copies may appear twice. It runs again the next time you add photos.');
+  if (restored) showNote(($('#note').hidden ? '' : $('#note').textContent + ' ') + `Picked up where you left off: ${nf.format(restored)} saved ${restored === 1 ? 'selection' : 'selections'} restored.`);
+  if (state.photos.length) { $('#bar').hidden = false; $('#resume').hidden = true; rebuild(); }
+  else { $('#intro').hidden = false; }
+}
+
+async function filesFromDrop(dt) {
+  const entries = [...dt.items].map(it => it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean);
+  if (!entries.length) return [...dt.files];
+  const out = [];
+  async function walk(entry) {
+    if (entry.isFile) { try { const f = await new Promise((res, rej) => entry.file(res, rej)); f._path = (entry.fullPath || '').replace(/^\//, ''); out.push(f); } catch (e) {} }
+    else if (entry.isDirectory) {
+      const r = entry.createReader(); let batch;
+      do { batch = await new Promise((res, rej) => r.readEntries(res, rej)); for (const e of batch) await walk(e); } while (batch.length);
+    }
+  }
+  for (const e of entries) await walk(e);
+  return out;
+}
+
+/* ================= Preview pipeline =================
+   Only tiles on or near the screen hold an image. Tiles that scroll away
+   release theirs. Phone JPEGs carry a tiny built-in preview that is used
+   directly; other photos are shrunk to a small copy two at a time, and the
+   full-size decode is thrown away immediately. */
+const THUMB_EDGE = 260;          // short edge of generated previews, in pixels
+const MAX_DECODES = 2;           // full-size decodes allowed at once
+const CACHE_LIMIT = 1500;        // small generated previews kept for quick re-display
+const cache = shared.thumbCache;
+const queue = [];
+let active = 0, io = null;
+
+function cacheGet(id) { const b = cache.get(id); if (b) { cache.delete(id); cache.set(id, b); } return b; }
+function cachePut(id, blob) { cache.set(id, blob); if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value); }
+
+function makeObserver() {
+  if (io) io.disconnect();
+  io = new IntersectionObserver(entries => {
+    for (const en of entries) { const p = en.target._p; if (en.isIntersecting) showThumb(p); else hideThumb(p); }
+    updateThumbStat();
+  }, { rootMargin: '700px 0px' });
+}
+
+function showThumb(p) {
+  p.visible = true;
+  if (p.url || p.noPreview) return;
+  if (p.thumb && !p.thumbBad) { setImg(p, p.file.slice(p.thumb.start, p.thumb.start + p.thumb.len, 'image/jpeg'), true); return; }
+  const c = cacheGet(p.id);
+  if (c) { setImg(p, c, false); return; }
+  p.tileEl.classList.add('loading');
+  queue.push(p);
+  if (queue.length > 4000) { const keep = queue.filter(q => q.visible && !q.url); queue.length = 0; queue.push(...keep); }
+  pump();
+}
+
+function releaseImg(p) {
+  if (!p.tileEl) return;
+  const img = p.tileEl.querySelector('img');
+  img.onload = img.onerror = null;
+  img.removeAttribute('src');
+  if (p.url) { URL.revokeObjectURL(p.url); p.url = null; }
+}
+function hideThumb(p) { p.visible = false; releaseImg(p); if (p.tileEl) p.tileEl.classList.remove('loading'); }
+
+function setImg(p, blob, embedded) {
+  const t = p.tileEl, img = t.querySelector('img');
+  t.classList.remove('o3', 'o6', 'o8');
+  if (embedded && [3, 6, 8].includes(p.orientation)) t.classList.add('o' + p.orientation);
+  p.url = URL.createObjectURL(blob);
+  img.onload = () => t.classList.remove('loading');
+  img.onerror = () => {
+    releaseImg(p);
+    if (embedded) { p.thumbBad = true; if (p.visible) showThumb(p); }
+    else { p.noPreview = true; t.classList.remove('loading'); t.classList.add('noprev'); }
+  };
+  img.src = p.url;
+}
+
+async function makePreview(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.decoding = 'async';
+  try {
+    img.src = url;
+    await img.decode();
+    const w = img.naturalWidth, hgt = img.naturalHeight;
+    if (!w || !hgt) throw new Error('empty');
+    const s = Math.min(1, THUMB_EDGE / Math.min(w, hgt));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(hgt * s));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8));
+    c.width = c.height = 0;
+    if (!blob) throw new Error('encode');
+    return blob;
+  } finally {
+    img.removeAttribute('src');
+    URL.revokeObjectURL(url);
+  }
+}
+
+function pump() {
+  while (active < MAX_DECODES && queue.length) {
+    const p = queue.pop();                          // newest request first, so the current view wins
+    if (!p.visible || p.url || p.busy || p.noPreview) continue;
+    p.busy = true; active++;
+    makePreview(p.file)
+      .then(blob => { cachePut(p.id, blob); if (p.visible && !p.url) setImg(p, blob, false); })
+      .catch(() => { p.noPreview = true; if (p.tileEl) { p.tileEl.classList.remove('loading'); p.tileEl.classList.add('noprev'); } })
+      .finally(() => { p.busy = false; active--; setTimeout(pump, 0); updateThumbStat(); });
+  }
+  updateThumbStat();
+}
+
+let statTimer = 0;
+function updateThumbStat() {
+  if (statTimer) return;
+  statTimer = setTimeout(() => {
+    statTimer = 0;
+    const waiting = queue.filter(p => p.visible && !p.url && !p.noPreview).length + active;
+    $('#thumbStat').textContent = waiting ? `Loading ${nf.format(waiting)} previews…` : '';
+  }, 150);
+}
+
+/* ================= Days ================= */
+function roundTime(d) {
+  if (!state.round) return d;
+  const step = state.round * 60000;
+  return new Date(Math.round(d.getTime() / step) * step);
+}
+// Photo-based times for a day, from the photos loaded right now
+function stats(day) {
+  let s = null, e = null, count = 0;
+  for (const p of day.photos) if (p.selected) { if (!s) s = p.date; e = p.date; count++; }
+  if (!count) return null;
+  return { s, e, count, rs: roundTime(s), re: roundTime(e) };
+}
+// Photo times plus this day's adjustments (minutes before, after, travel)
+function dayTotals(key, rs, re) {
+  const a = adjOf(key);
+  const start = new Date(rs.getTime() - a.before * 60000), end = new Date(re.getTime() + a.after * 60000);
+  const photoMs = Math.max(0, re - rs);
+  const ms = Math.max(0, Math.max(0, end - start) + a.travel * 60000);
+  return { start, end, photoMs, ms, addMs: ms - photoMs, a };
+}
+const volCount = key => { const d = dayInfo(key); return d ? (d.count != null ? d.count : d.names.length) : 0; };
+const numStr = x => String(Math.round(x * 100) / 100);
+const volHours = (ms, n) => ms / 3600000 * n;
+const hmSigned = ms => (ms < 0 ? '−' : '+') + hm(Math.abs(ms));
+const t12pad = d => { let hh = d.getHours(); const ap = hh < 12 ? 'AM' : 'PM'; hh = hh % 12 || 12; return `${pad(hh)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ap}`; };
+function parseNames(text) {
+  const seen = new Set(), out = [];
+  for (const raw of text.split(/[\n,]/)) {
+    const n = raw.trim().replace(/\s+/g, ' ');
+    if (n && !seen.has(n.toLowerCase())) { seen.add(n.toLowerCase()); out.push(n); }
+  }
+  return out;
+}
+function knownNames() {
+  const freq = new Map();
+  for (const d of Object.values(saved.days)) for (const n of d.names) {
+    const k = n.toLowerCase(); const f = freq.get(k);
+    if (f) f.n++; else freq.set(k, { name: n, n: 1 });
+  }
+  return [...freq.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name)).map(x => x.name);
+}
+
+// Your tracking sheet's columns. Start, End and Duration include adjustments.
+const LOG_HEAD = ['Date', 'Volunteers', '# of Volunteers', 'Start Time', 'End Time', 'Duration', 'Total Hours', 'Activities'];
+function logRow(key, st) {
+  const d = dayInfo(key), n = volCount(key), T = dayTotals(key, st.rs, st.re);
+  return [key, d ? d.names.join('\n') : '', n, t12pad(T.start), t12pad(T.end), numStr(T.ms / 3600000), numStr(volHours(T.ms, n)), d ? d.notes.trim() : ''];
+}
+const tsvCell = v => { const t = String(v); return /[\t\n\r"]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+const toTSV = rows => rows.map(r => r.map(tsvCell).join('\t')).join('\n');
+
+function rebuild() {
+  for (const p of state.photos) { hideThumb(p); p.tileEl = null; }
+  queue.length = 0;
+  const from = $('#from').value, to = $('#to').value;
+  const groups = new Map();
+  for (const p of state.photos) {
+    if (p.dupOf) continue;
+    const key = dISO(p.date);
+    if ((from && key < from) || (to && key > to)) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(p);
+  }
+  let entries = [...groups.entries()];
+  if (state.onlySel) entries = entries.filter(([, ph]) => ph.some(p => p.selected));
+  state.days = entries
+    .sort((a, b) => state.order === 'asc' ? a[0].localeCompare(b[0]) : b[0].localeCompare(a[0]))
+    .map(([key, photos]) => ({ key, photos: photos.sort((a, b) => a.date - b.date), els: {} }));
+
+  if (state.photos.length) {
+    let min = '9999', max = '0000';
+    for (const p of state.photos) { const k = dISO(p.date); if (k < min) min = k; if (k > max) max = k; }
+    for (const id of ['#from', '#to']) { $(id).min = min; $(id).max = max; }
+  }
+
+  makeObserver();
+  const box = $('#days');
+  box.replaceChildren();
+  const frag = document.createDocumentFragment();
+  if (!state.days.length && state.photos.length) frag.append(h('p', { class: 'empty-filter' }, state.onlySel
+    ? 'No days with selected photos in this date range. Turn off “Only days with selections” to see every day and pick photos.'
+    : 'No photos in this date range. Widen the From and To dates to see more days.'));
+  for (const day of state.days) frag.append(renderDay(day));
+  box.append(frag);
+  updateSummary();
+}
+
+function copyBtn(getText, label) {
+  const b = h('button', { class: 'btn small', type: 'button' }, label || 'Copy');
+  b.addEventListener('click', () => copyText(getText(), b));
+  return b;
+}
+
+function renderDay(day) {
+  const first = day.photos[0].date;
+  const when = longDate(first);
+  const uid = 'd' + day.key.replace(/-/g, '');
+  const E = day.els;
+  E.meta = h('span', { class: 'meta' });
+  E.tl = h('div', { class: 'tl', role: 'img' });
+  E.digest = h('div', { class: 'digest' });
+
+  // Reviewed: same spot on every day, at the left of the header
+  E.rev = h('button', { class: 'rev', type: 'button', 'aria-pressed': 'false' },
+    h('span', { class: 'box', 'aria-hidden': 'true' }), 'Reviewed');
+  E.rev.setAttribute('aria-label', `Reviewed, ${when}`);
+  E.rev.addEventListener('click', () => {
+    const d = ensureDay(day.key); d.reviewed = !d.reviewed;
+    persist(); updateDay(day); updateSummary();
+  });
+
+  const field = (label, cls) => {
+    const input = h('input', { readonly: true, placeholder: 'No photos selected', 'aria-label': `${label}, ${when}` });
+    input.addEventListener('focus', () => input.select());
+    const hmEl = h('span', { class: 'hm' });
+    return { wrap: h('div', { class: 'field ' + (cls || '') }, h('label', {}, label), h('div', { class: 'row' }, input, copyBtn(() => input.value)), hmEl), input, hmEl };
+  };
+  const fs = field('Start'), fe = field('End'), fh = field('Duration (hours)', 'hours');
+  E.start = fs.input; E.end = fe.input; E.hours = fh.input;
+  E.startHint = fs.hmEl; E.endHint = fe.hmEl; E.hm = fh.hmEl;
+
+  // Time the photos don't show, in minutes
+  const a = adjOf(day.key);
+  const adjInput = (label, key, hint) => {
+    const input = h('input', { id: uid + key, class: 'mins', type: 'number', step: '5', min: '-1440', max: '1440', inputmode: 'numeric', placeholder: '0' });
+    input.value = a[key] ? String(a[key]) : '';
+    input.addEventListener('input', () => {
+      const d = ensureDay(day.key);
+      d.adjust = { ...adjOf(day.key), [key]: clampMin(input.value || 0) };
+      persist(); updateDay(day); updateSummary();
+    });
+    return h('div', { class: 'field' }, h('label', { for: uid + key }, label), h('div', { class: 'row' }, input, h('span', { class: 'unit' }, 'min')), h('span', { class: 'hint' }, hint));
+  };
+  const adj = h('div', { class: 'adj' },
+    h('p', { class: 'adjtitle' }, 'Time the photos don’t show'),
+    adjInput('Before first photo', 'before', 'Moves the start earlier'),
+    adjInput('After last photo', 'after', 'Moves the end later'),
+    adjInput('Travel', 'travel', 'Added to the duration'));
+
+  // Volunteer details for this day
+  const info = dayInfo(day.key);
+  E.names = h('textarea', { id: uid + 'n', rows: '4', placeholder: 'One name per line', spellcheck: 'false' });
+  E.names.value = info ? info.names.join('\n') : '';
+  E.chips = h('div', { class: 'chips' });
+  E.count = h('input', { id: uid + 'c', class: 'count', type: 'number', min: '0', step: '1', inputmode: 'numeric' });
+  E.countHint = h('span', { class: 'hint' });
+  E.volHours = h('input', { readonly: true, 'aria-label': `Total volunteer hours, ${when}` });
+  E.volHours.addEventListener('focus', () => E.volHours.select());
+  E.notes = h('textarea', { id: uid + 'a', rows: '4', placeholder: 'What was done, one activity per line' });
+  E.notes.value = info ? info.notes : '';
+
+  E.names.addEventListener('input', () => {
+    const d = ensureDay(day.key);
+    d.names = parseNames(E.names.value);
+    if (d.count === d.names.length) d.count = null;
+    persist(); updateVol(day); refreshAllChips(); updateSummary();
+  });
+  E.names.addEventListener('focus', () => refreshChips(day));
+  E.count.addEventListener('input', () => {
+    const d = ensureDay(day.key), v = E.count.value.trim(), n = parseInt(v, 10);
+    d.count = v === '' || !Number.isInteger(n) || n < 0 || n === d.names.length ? null : n;
+    persist(); updateVol(day, true); updateSummary();
+  });
+  E.count.addEventListener('blur', () => updateVol(day));
+  E.notes.addEventListener('input', () => { ensureDay(day.key).notes = E.notes.value; persist(); });
+
+  const vol = h('div', { class: 'vol' },
+    h('div', { class: 'field' }, h('label', { for: uid + 'n' }, 'Volunteers'), E.names, E.chips),
+    h('div', { class: 'volnums' },
+      h('div', { class: 'field' }, h('label', { for: uid + 'c' }, 'Number of volunteers'), E.count, E.countHint),
+      h('div', { class: 'field hours' }, h('label', {}, 'Total volunteer hours'), h('div', { class: 'row' }, E.volHours, copyBtn(() => E.volHours.value)), h('span', { class: 'hint' }, 'Duration × volunteers'))),
+    h('div', { class: 'field' }, h('label', { for: uid + 'a' }, 'Activities and notes'), E.notes));
+
+  const grid = h('div', { class: 'grid' });
+  for (const p of day.photos) grid.append(makeTile(p, day));
+  const setAll = v => { day.photos.forEach(p => setSel(p, v)); updateDay(day); updateSummary(); };
+
+  E.sec = h('section', { class: 'day', id: 'day-' + day.key, 'aria-label': when },
+    h('div', { class: 'dayhead' }, E.rev, h('h2', {}, when), E.meta),
+    E.digest,
+    E.tl,
+    h('div', { class: 'fields' }, fs.wrap, fe.wrap, fh.wrap),
+    adj,
+    vol,
+    h('div', { class: 'dayactions' },
+      copyBtn(() => rowFor(day) || '', 'Copy row for spreadsheet'),
+      h('button', { class: 'btn small', type: 'button', onclick: () => setAll(true) }, 'Select all'),
+      h('button', { class: 'btn small', type: 'button', onclick: () => setAll(false) }, 'Select none')),
+    grid);
+  updateDay(day);
+  refreshChips(day);
+  return E.sec;
+}
+
+let chipTimer = 0;
+function refreshAllChips() { clearTimeout(chipTimer); chipTimer = setTimeout(() => state.days.forEach(refreshChips), 250); }
+function refreshChips(day) {
+  const E = day.els, d = dayInfo(day.key);
+  const have = new Set((d ? d.names : []).map(n => n.toLowerCase()));
+  const names = knownNames().filter(n => !have.has(n.toLowerCase())).slice(0, 12);
+  E.chips.replaceChildren(...names.map(n => h('button', {
+    class: 'chip', type: 'button', 'aria-label': `Add ${n}`,
+    onclick: () => {
+      const cur = E.names.value.replace(/\s+$/, '');
+      E.names.value = (cur ? cur + '\n' : '') + n;
+      E.names.dispatchEvent(new Event('input'));
+    }
+  }, n)));
+}
+
+function updateVol(day, keepCountField) {
+  const E = day.els, d = dayInfo(day.key), st = stats(day);
+  const named = d ? d.names.length : 0, n = volCount(day.key);
+  if (!keepCountField) E.count.value = n ? String(n) : '';
+  E.count.setAttribute('aria-label', `Number of volunteers, ${longDate(day.photos[0].date)}`);
+  E.countHint.textContent = d && d.count != null ? `Entered by hand (${named} named)` : 'Counted from names. Type a number to change it.';
+  E.volHours.value = st && n ? numStr(volHours(dayTotals(day.key, st.rs, st.re).ms, n)) : '';
+  E.volHours.placeholder = st ? 'Add volunteers' : 'No photos selected';
+}
+
+const tpl = $('#tileTpl').content.firstElementChild;
+function makeTile(p, day) {
+  const t = tpl.cloneNode(true);
+  const pick = t.querySelector('.pick');
+  t.querySelector('.ttime').textContent = t12(p.date);
+  pick.setAttribute('aria-label', `${p.name}, ${t12(p.date)}`);
+  pick.setAttribute('aria-pressed', String(p.selected));
+  if (!p.selected) t.classList.remove('on'); else t.classList.add('on');
+  if (p.copies && p.copies.length) {
+    const n = p.copies.length + 1;
+    pick.setAttribute('aria-label', `${p.name}, ${t12(p.date)}, ${n} identical copies`);
+    pick.append(h('span', { class: 'dupe', title: 'Identical copies found at:\n' + [p, ...p.copies].map(x => x.path).join('\n') }, `${n} copies`));
+  }
+  if (p.source === 'file') {
+    pick.append(h('span', { class: 'flag', title: 'No camera date or dated file name was found, so this uses the file’s modified time. Check it looks right.' }, 'File date'));
+  }
+  if (p.noPreview) t.classList.add('noprev');
+  pick.addEventListener('click', () => { setSel(p, !p.selected); updateDay(day); updateSummary(); });
+  const zoom = t.querySelector('.zoom');
+  zoom.setAttribute('aria-label', `View ${p.name} larger`);
+  zoom.addEventListener('click', () => openViewer(day, p));
+  t._p = p; p.tileEl = t;
+  io.observe(t);
+  return t;
+}
+
+function setSel(p, v) {
+  p.selected = v;
+  for (const m of [p, ...(p.copies || [])]) {
+    const k = photoKey(m);
+    if (v) { saved.sel.add(k); recordInfo(m); } else { saved.sel.delete(k); saved.info.delete(k); }
+  }
+  persist();
+  if (p.tileEl) { p.tileEl.classList.toggle('on', v); p.tileEl.querySelector('.pick').setAttribute('aria-pressed', String(v)); }
+}
+
+function updateDay(day) {
+  const E = day.els, st = stats(day), info = dayInfo(day.key), reviewed = !!(info && info.reviewed);
+  E.sec.classList.toggle('reviewed', reviewed);
+  E.sec.classList.toggle('empty', !st);
+  E.rev.setAttribute('aria-pressed', String(reviewed));
+  E.rev.title = reviewed ? 'Reviewed. Click to expand this day again.' : 'Mark this day reviewed and collapse it';
+  E.meta.textContent = st ? `${st.count} of ${day.photos.length} photos selected` : (reviewed ? 'No volunteer photos' : `0 of ${day.photos.length} photos selected`);
+  if (st) {
+    const T = dayTotals(day.key, st.rs, st.re);
+    E.start.value = fmtStamp(T.start); E.end.value = fmtStamp(T.end);
+    E.hours.value = numStr(T.ms / 3600000);
+    E.startHint.textContent = `First photo ${t12(st.rs)}`;
+    E.endHint.textContent = `Last photo ${t12(st.re)}`;
+    E.hm.textContent = T.addMs ? `Photos ${hm(T.photoMs)}, ${hmSigned(T.addMs)} adjusted` : `Photos ${hm(T.photoMs)}`;
+  } else {
+    E.start.value = E.end.value = E.hours.value = '';
+    E.startHint.textContent = E.endHint.textContent = E.hm.textContent = '';
+  }
+  if (!reviewed) drawTimeline(day, st);
+  updateVol(day);
+  fillDigest(day, st, reviewed);
+}
+
+// Collapsed view of a reviewed day
+function fillDigest(day, st, reviewed) {
+  const E = day.els;
+  if (!reviewed || !st) { E.digest.replaceChildren(); return; }
+  const d = dayInfo(day.key), T = dayTotals(day.key, st.rs, st.re), n = volCount(day.key);
+  const lines = [h('div', { class: 'line' },
+    h('strong', {}, `${t12(T.start)} to ${t12(T.end)}`),
+    h('span', {}, `${numStr(T.ms / 3600000)} hours` + (T.addMs ? ` (${hmSigned(T.addMs)} adjusted)` : '')),
+    h('span', {}, `${n} ${n === 1 ? 'volunteer' : 'volunteers'}`),
+    h('strong', {}, `${numStr(volHours(T.ms, n))} volunteer hours`))];
+  if (d && d.names.length) lines.push(h('div', { class: 'line' }, d.names.join(', ')));
+  const acts = d ? d.notes.split('\n').map(x => x.trim()).filter(Boolean) : [];
+  if (acts.length) lines.push(h('div', { class: 'line muted' }, acts.join('; ')));
+  E.digest.replaceChildren(...lines);
+}
+
+function drawTimeline(day, st) {
+  const tl = day.els.tl;
+  const hr = d => d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+  let lo = Math.floor(hr(day.photos[0].date)), hi = Math.ceil(hr(day.photos[day.photos.length - 1].date) + 0.001);
+  while (hi - lo < 4) { if (lo > 0) lo--; if (hi - lo < 4 && hi < 24) hi++; }
+  const span = hi - lo, pos = x => (x - lo) / span * 100;
+  const frag = document.createDocumentFragment();
+  frag.append(h('div', { class: 'axis' }));
+  if (st) { const a = pos(hr(st.s)), b = pos(hr(st.e)); frag.append(h('div', { class: 'band', style: `left:${a}%;width:${b - a}%` })); }
+  for (const p of day.photos) frag.append(h('div', { class: 'tick' + (p.selected ? '' : ' off'), style: `left:${pos(hr(p.date))}%` }));
+  const step = span <= 8 ? 1 : span <= 14 ? 2 : 3;
+  for (let x = lo; x <= hi; x += step) {
+    const cls = 'hr' + (x === lo ? ' first' : '') + (x + step > hi && x !== lo ? ' last' : '');
+    frag.append(h('span', { class: cls, style: `left:${pos(x)}%` }, hourLabel(x)));
+  }
+  tl.replaceChildren(frag);
+  tl.setAttribute('aria-label', st ? `Photos from ${t12(st.s)} to ${t12(st.e)}` : 'No photos selected');
+}
+
+function rowFor(day) {
+  const st = stats(day);
+  return st ? toTSV([logRow(day.key, st)]) : null;
+}
+
+function updateSummary() {
+  const shown = state.days.reduce((n, d) => n + d.photos.length, 0);
+  let total = 0, withHours = 0, vh = 0, reviewed = 0;
+  for (const d of state.days) {
+    const st = stats(d);
+    if (st) { const T = dayTotals(d.key, st.rs, st.re); total += T.ms; withHours++; vh += volHours(T.ms, volCount(d.key)); }
+    if ((dayInfo(d.key) || {}).reviewed) reviewed++;
+  }
+  $('#sumMain').textContent = `${numStr(vh)} volunteer hours across ${withHours} ${withHours === 1 ? 'day' : 'days'}`;
+  $('#sumSub').textContent = `${numStr(total / 3600000)} hours on site. Reviewed ${nf.format(reviewed)} of ${nf.format(state.days.length)} days shown, ${nf.format(shown)} photos` +
+    (shown < uniquePhotos().length ? ` (${nf.format(uniquePhotos().length)} loaded)` : '') +
+    (dupCount() ? `, ${nf.format(dupCount())} duplicate ${dupCount() === 1 ? 'copy' : 'copies'} grouped` : '');
+  const c = { camera: 0, name: 0, file: 0 };
+  for (const p of state.photos) if (!p.dupOf) c[p.source]++;
+  const parts = [];
+  if (c.camera) parts.push(`${nf.format(c.camera)} from camera info`);
+  if (c.name) parts.push(`${nf.format(c.name)} from file names`);
+  if (c.file) parts.push(`${nf.format(c.file)} from file modified times`);
+  $('#sumSrc').textContent = 'Dates: ' + parts.join(', ');
+}
+
+/* ================= Clipboard ================= */
+async function copyText(text, btn) {
+  if (!text) { flash(btn, 'Nothing selected'); return; }
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {}
+  if (!ok) {
+    const ta = h('textarea', { style: 'position:fixed;top:0;left:0;opacity:0' });
+    ta.value = text; document.body.append(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+  }
+  flash(btn, ok ? 'Copied' : 'Copy blocked, use Ctrl+C');
+}
+function flash(btn, msg) {
+  if (!btn._label) btn._label = btn.textContent;
+  btn.textContent = msg;
+  clearTimeout(btn._t);
+  btn._t = setTimeout(() => { btn.textContent = btn._label; }, 1400);
+}
+
+/* ================= Viewer (one full-size photo at a time) ================= */
+const dlg = $('#viewer'), vImg = $('#vImg'), vMsg = $('#vMsg');
+const view = { day: null, i: 0, url: null };
+function openViewer(day, p) { view.day = day; view.i = day.photos.indexOf(p); showView(); dlg.showModal(); }
+function showView() {
+  const p = view.day.photos[view.i];
+  if (view.url) URL.revokeObjectURL(view.url);
+  view.url = URL.createObjectURL(p.file);
+  vImg.hidden = false; vMsg.hidden = true;
+  vImg.src = view.url;
+  const src = p.source === 'file' ? ' (file modified time)' : p.source === 'name' ? ' (from file name)' : '';
+  $('#vTime').textContent = `${t12(p.date)}, ${longDate(p.date)}${src}`;
+  $('#vName').textContent = `${p.path}, ${view.i + 1} of ${view.day.photos.length}` +
+    (p.copies && p.copies.length ? `. Identical ${p.copies.length === 1 ? 'copy' : 'copies'} at: ${p.copies.map(c => c.path).join(', ')}` : '');
+  $('#vToggle').textContent = p.selected ? 'Leave out of hours' : 'Include in hours';
+  $('#vPrev').disabled = view.i === 0;
+  $('#vNext').disabled = view.i === view.day.photos.length - 1;
+}
+vImg.addEventListener('error', () => {
+  if (!view.url) return;
+  vImg.hidden = true; vMsg.hidden = false;
+  vMsg.textContent = 'This browser can’t display this file type (often HEIC from iPhones). Its date was still read. Safari can display HEIC photos.';
+});
+const stepView = d => { const n = view.i + d; if (n >= 0 && n < view.day.photos.length) { view.i = n; showView(); } };
+$('#vPrev').onclick = () => stepView(-1);
+$('#vNext').onclick = () => stepView(1);
+$('#vClose').onclick = () => dlg.close();
+$('#vToggle').onclick = () => { const p = view.day.photos[view.i]; setSel(p, !p.selected); updateDay(view.day); updateSummary(); showView(); };
+dlg.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') stepView(-1); if (e.key === 'ArrowRight') stepView(1); });
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+dlg.addEventListener('close', () => { vImg.removeAttribute('src'); if (view.url) { URL.revokeObjectURL(view.url); view.url = null; } });
+
+/* ================= Wiring ================= */
+$('#pickFolder').onclick = () => $('#folderInput').click();
+$('#pickFiles').onclick = () => $('#fileInput').click();
+$('#addMore').onclick = () => $('#folderInput').click();
+$('#stopRead').onclick = () => { state.stop = true; };
+for (const id of ['#folderInput', '#fileInput']) $(id).addEventListener('change', e => { const f = [...e.target.files]; e.target.value = ''; addFiles(f); });
+
+let dragDepth = 0;
+const drop = $('#drop');
+document.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; drop.classList.add('over'); }, onLife);
+document.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; drop.classList.remove('over'); } }, onLife);
+document.addEventListener('dragover', e => e.preventDefault(), onLife);
+document.addEventListener('drop', async e => {
+  e.preventDefault(); dragDepth = 0; drop.classList.remove('over');
+  if (state.reading) return;
+  showNote('Collecting files…');
+  addFiles(await filesFromDrop(e.dataTransfer));
+}, onLife);
+
+$('#from').onchange = $('#to').onchange = rebuild;
+$('#onlySel').onclick = e => {
+  state.onlySel = !state.onlySel;
+  e.currentTarget.setAttribute('aria-pressed', String(state.onlySel));
+  rebuild();
+  window.scrollTo({ top: 0 });
+};
+
+/* ================= Report =================
+   Built from the saved data, so it covers every day you've worked on,
+   whether or not those photos are loaded right now. */
+function reportDays() {
+  const from = $('#from').value, to = $('#to').value;
+  const { days, copies, missing } = savedPhotoDays();
+  const out = [];
+  for (const [key, photos] of [...days.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    if ((from && key < from) || (to && key > to)) continue;
+    const s = photos[0].t, e = photos[photos.length - 1].t;
+    const st = { s, e, rs: roundTime(s), re: roundTime(e) };
+    const T = dayTotals(key, st.rs, st.re), n = volCount(key);
+    for (const ph of photos) ph.copies = copies.get(ph.key) || [];
+    out.push({ key, photos, st, T, ms: T.ms, n, vh: volHours(T.ms, n), info: dayInfo(key) });
+  }
+  out.missing = missing;
+  return out;
+}
+function peopleTotals(days) {
+  const map = new Map();
+  for (const d of days) for (const name of (d.info ? d.info.names : [])) {
+    const k = name.toLowerCase();
+    const r = map.get(k) || { name, days: 0, hours: 0 };
+    r.days++; r.hours += d.ms / 3600000;
+    map.set(k, r);
+  }
+  return [...map.values()].sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
+}
+const t12s = d => t12(d).replace(' ', `:${pad(d.getSeconds())} `);
+const folderOf = path => { const i = path.lastIndexOf('/'); return i > 0 ? path.slice(0, i) : ''; };
+const baseName = path => path.slice(path.lastIndexOf('/') + 1);
+const csvCell = v => { const t = String(v); return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+const toCSV = rows => '\ufeff' + rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
+
+function logCSV(days) {
+  const rows = [LOG_HEAD];
+  let n = 0, dur = 0, vh = 0;
+  for (const d of days) { rows.push(logRow(d.key, d.st)); n += d.n; dur += d.ms / 3600000; vh += d.vh; }
+  rows.push(['Total', '', n, '', '', numStr(dur), numStr(vh), '']);
+  return toCSV(rows);
+}
+function peopleCSV(days) {
+  const rows = [['Volunteer', 'Days', 'Hours']];
+  for (const r of peopleTotals(days)) rows.push([r.name, r.days, numStr(r.hours)]);
+  return toCSV(rows);
+}
+function photoListRows(days) {
+  const rows = [['Date', 'Time taken', 'Taken (ISO 8601)', 'File name', 'Folder', 'File size (bytes)', 'Duplicate copies']];
+  for (const d of days) for (const ph of d.photos)
+    rows.push([d.key, t12s(ph.t), isoLocal(ph.t), baseName(ph.path), folderOf(ph.path), ph.key.slice(ph.key.lastIndexOf('|') + 1), ph.copies.join(' | ')]);
+  return rows;
+}
+function rangeText(days) {
+  const from = $('#from').value, to = $('#to').value;
+  if (from || to) return `Covers ${from ? longDate(new Date(from + 'T00:00')) : 'the earliest photo'} to ${to ? longDate(new Date(to + 'T00:00')) : 'the latest photo'}.`;
+  return days.length ? `Covers ${longDate(days[0].st.s)} to ${longDate(days[days.length - 1].st.s)}.` : '';
+}
+
+function openReport() {
+  const days = reportDays();
+  const body = $('#repBody');
+  $('#repNote').textContent = '';
+  for (const id of ['#dlLog', '#copyLog', '#dlPeople', '#dlPhotos']) $(id).disabled = !days.length;
+  const parts = [];
+  if (days.missing) parts.push(h('p', { class: 'warn' }, `${nf.format(days.missing)} selected ${days.missing === 1 ? 'photo was' : 'photos were'} saved before photo times were recorded. Load ${days.missing === 1 ? 'it' : 'them'} once and ${days.missing === 1 ? 'it’s' : 'they’re'} included from then on.`));
+  if (!days.length) {
+    $('#repLead').textContent = '';
+    parts.push(h('p', { class: 'empty' }, 'No photos are selected yet. Close this report, click the photos from your volunteer work, then open the report again.'));
+    body.replaceChildren(...parts);
+  } else {
+    const totalDur = days.reduce((n, d) => n + d.ms, 0) / 3600000;
+    const totalVH = days.reduce((n, d) => n + d.vh, 0);
+    const visits = days.reduce((n, d) => n + d.n, 0);
+    const people = peopleTotals(days);
+    const unnamed = days.some(d => d.n > (d.info ? d.info.names.length : 0));
+    $('#repLead').textContent = `${numStr(totalVH)} total volunteer hours over ${days.length} ${days.length === 1 ? 'day' : 'days'}. ` +
+      `${nf.format(people.length)} different named ${people.length === 1 ? 'volunteer' : 'volunteers'} and ${nf.format(visits)} volunteer ${visits === 1 ? 'visit' : 'visits'} in total` +
+      `${unnamed ? ' (some days include volunteers without names)' : ''}. ${rangeText(days)}`;
+
+    const noVol = days.filter(d => !d.n);
+    if (noVol.length) parts.push(h('p', { class: 'warn' }, `${noVol.length} ${noVol.length === 1 ? 'day has' : 'days have'} no volunteers entered yet, so ${noVol.length === 1 ? 'it adds' : 'they add'} 0 volunteer hours: ${noVol.map(d => d.key).join(', ')}.`));
+    const from = $('#from').value, to = $('#to').value, inReport = new Set(days.map(d => d.key));
+    const orphan = Object.entries(cleanDays(saved.days))
+      .filter(([k, v]) => !inReport.has(k) && (v.names.length || v.count || v.notes.trim()) && (!from || k >= from) && (!to || k <= to))
+      .map(([k]) => k).sort();
+    if (orphan.length) parts.push(h('p', { class: 'warn' }, `${orphan.length} ${orphan.length === 1 ? 'day has' : 'days have'} volunteer details but no selected photos, so ${orphan.length === 1 ? 'it isn’t' : 'they aren’t'} in this report: ${orphan.join(', ')}.`));
+
+    const tbody = h('tbody');
+    for (const d of days) {
+      tbody.append(h('tr', {},
+        h('td', {}, d.key), h('td', { class: 'multi' }, d.info ? d.info.names.join('\n') : ''),
+        h('td', { class: 'num' }, String(d.n)), h('td', {}, t12pad(d.T.start)), h('td', {}, t12pad(d.T.end)),
+        h('td', { class: 'num' }, numStr(d.ms / 3600000)), h('td', { class: 'num' }, numStr(d.vh)),
+        h('td', { class: 'acts' }, d.info ? d.info.notes.trim() : '')));
+      const list = h('ul');
+      for (const ph of d.photos) list.append(h('li', {}, h('span', {}, t12(ph.t)), ph.path, ph.copies.length ? h('span', {}, ` (+${ph.copies.length} identical ${ph.copies.length === 1 ? 'copy' : 'copies'})`) : null));
+      const a = d.T.a, adjParts = [];
+      if (a.before) adjParts.push(`${hmSigned(a.before * 60000)} before`);
+      if (a.after) adjParts.push(`${hmSigned(a.after * 60000)} after`);
+      if (a.travel) adjParts.push(`${hmSigned(a.travel * 60000)} travel`);
+      const basis = `Photos ${t12(d.st.rs)} to ${t12(d.st.re)} (${hm(d.T.photoMs)})` + (adjParts.length ? `, adjusted ${adjParts.join(', ')}` : '');
+      tbody.append(h('tr', { class: 'files' }, h('td', { colspan: '8' },
+        h('details', {}, h('summary', {}, `${basis}. Show ${d.photos.length === 1 ? 'the photo' : 'all ' + d.photos.length + ' photos'}`), list))));
+    }
+    parts.push(h('table', {},
+      h('thead', {}, h('tr', {}, ...LOG_HEAD.map((t, i) => h('th', { class: [2, 5, 6].includes(i) ? 'num' : '' }, t)))),
+      tbody,
+      h('tfoot', {}, h('tr', {}, h('td', { colspan: '2' }, 'Total'), h('td', { class: 'num' }, nf.format(visits)), h('td', { colspan: '2' }),
+        h('td', { class: 'num' }, numStr(totalDur)), h('td', { class: 'num' }, numStr(totalVH)), h('td')))));
+
+    parts.push(h('h3', { class: 'sub' }, 'Hours by volunteer'));
+    if (people.length) {
+      parts.push(h('table', {},
+        h('thead', {}, h('tr', {}, h('th', {}, 'Volunteer'), h('th', { class: 'num' }, 'Days'), h('th', { class: 'num' }, 'Hours'))),
+        h('tbody', {}, ...people.map(r => h('tr', {}, h('td', {}, r.name), h('td', { class: 'num' }, String(r.days)), h('td', { class: 'num' }, numStr(r.hours)))))));
+    } else parts.push(h('p', { class: 'empty' }, 'Add volunteer names to each day to see hours per person.'));
+    body.replaceChildren(...parts);
+  }
+  openReportSaveInfo();
+  const dlg = $('#report');
+  if (!dlg.open) dlg.showModal();
+}
+
+/* Saving files: inside Claude the viewer's download prompt is used;
+   everywhere else, a normal browser download. */
+const downloadsReady = (window.claude && typeof window.claude.use === 'function')
+  ? window.claude.use('downloads').catch(() => null) : Promise.resolve(null);
+async function saveFile(filename, text, btn, noteEl) {
+  noteEl = noteEl || $('#repNote');
+  const dl = await downloadsReady;
+  if (dl) {
+    try { await dl.save({ filename, data: text }); flash(btn, 'Saved'); }
+    catch (e) {
+      if (e && e.code === 'declined') flash(btn, 'Not saved');
+      else if (e && e.code === 'rate_limited') noteEl.textContent = 'A save prompt is already open. Finish that one first.';
+      else noteEl.textContent = 'Downloads aren’t available here. Use “Copy log rows for spreadsheet” instead.';
+    }
+    return;
+  }
+  if (window.claude) { noteEl.textContent = 'Downloads aren’t available here. Use “Copy log rows for spreadsheet” instead.'; return; }
+  const url = URL.createObjectURL(new Blob([text], { type: filename.endsWith('.json') ? 'application/json' : 'text/csv;charset=utf-8' }));
+  const a = h('a', { href: url, download: filename, style: 'display:none' });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  flash(btn, 'Downloaded');
+}
+const stampName = () => dISO(new Date());
+$('#openReport').onclick = openReport;
+$('#repClose').onclick = () => $('#report').close();
+$('#report').addEventListener('click', e => { if (e.target === $('#report')) $('#report').close(); });
+$('#dlLog').onclick = e => { const days = reportDays(); if (days.length) saveFile(`volunteer-log-${stampName()}.csv`, logCSV(days), e.currentTarget); };
+$('#copyLog').onclick = e => { const days = reportDays(); copyText(toTSV(days.map(d => logRow(d.key, d.st))), e.currentTarget); };
+$('#dlPeople').onclick = e => { const days = reportDays(); if (days.length) saveFile(`volunteer-hours-by-person-${stampName()}.csv`, peopleCSV(days), e.currentTarget); };
+$('#dlPhotos').onclick = e => { const days = reportDays(); if (days.length) saveFile(`volunteer-photos-${stampName()}.csv`, toCSV(photoListRows(days)), e.currentTarget); };
+$('#order').onchange = e => { state.order = e.target.value; rebuild(); };
+$('#format').onchange = e => { state.format = e.target.value; state.days.forEach(updateDay); };
+$('#round').onchange = e => { state.round = +e.target.value; state.days.forEach(updateDay); updateSummary(); };
+$('#copyAll').onclick = e => {
+  const rows = [];
+  for (const d of state.days.slice().sort((a, b) => a.key.localeCompare(b.key))) { const st = stats(d); if (st) rows.push(logRow(d.key, st)); }
+  copyText(toTSV(rows), e.currentTarget);
+};
+$('#clear').onclick = () => {
+  if (!confirm('Remove all loaded photos from this page? Your files are not touched, and your saved selections and volunteer details are kept.')) return;
+  for (const p of state.photos) hideThumb(p);
+  if (io) io.disconnect();
+  queue.length = 0; cache.clear();
+  state.photos.length = 0; state.seen.clear(); state.days = [];
+  $('#days').replaceChildren(); $('#from').value = $('#to').value = '';
+  $('#bar').hidden = true; $('#intro').hidden = false; showNote('');
+  persist(); showResume();
+};
+
+/* ================= Saved progress ================= */
+function openReportSaveInfo() {
+  const nd = Object.keys(cleanDays(saved.days)).length;
+  const where = server.mode === 'on'
+    ? 'They’re saved to the data file on this computer, with a dated copy each day in the backups folder.'
+    : 'They’re saved in this browser only, and clearing your browser data erases them, so download a backup now and then.';
+  $('#saveInfo').textContent = `${nf.format(saved.sel.size)} selected ${saved.sel.size === 1 ? 'photo' : 'photos'} and details for ${nf.format(nd)} ${nd === 1 ? 'day' : 'days'}, including ones not loaded right now. ${where}`;
+  $('#saveNote').textContent = '';
+}
+
+function showResume() {
+  const el = $('#resume');
+  const nd = Object.keys(cleanDays(saved.days)).length;
+  el.hidden = (!saved.sel.size && !nd) || state.photos.length > 0;
+  el.textContent = `Saved from last time: ${nf.format(saved.sel.size)} selected ${saved.sel.size === 1 ? 'photo' : 'photos'} and details for ${nf.format(nd)} ${nd === 1 ? 'day' : 'days'}. Choose the same photos to pick up where you left off.`;
+}
+
+for (const id of ['#from', '#to', '#format', '#order', '#round']) $(id).addEventListener('change', persist);
+$('#onlySel').addEventListener('click', persist);
+window.addEventListener('pagehide', flushSave, onLife);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave(); }, onLife);
+
+$('#dlBackup').onclick = e => {
+  saveFile(`volunteer-data-backup-${stampName()}.json`, JSON.stringify(snapshot(), null, 1), e.currentTarget, $('#saveNote'));
+};
+$('#restoreBtn').onclick = () => $('#restoreInput').click();
+$('#restoreInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!d || !Array.isArray(d.selected)) throw new Error('shape');
+    const before = saved.sel.size;
+    for (const k of d.selected) if (typeof k === 'string' && k.includes('|')) saved.sel.add(k);
+    if (d.photoInfo && typeof d.photoInfo === 'object')
+      for (const [k, v] of Object.entries(d.photoInfo)) if (v && typeof v.t === 'string' && typeof v.p === 'string' && !saved.info.has(k)) saved.info.set(k, { t: v.t, p: v.p, ...(typeof v.c === 'string' ? { c: v.c } : {}) });
+    const incoming = cleanDays(d.days);
+    for (const [k, v] of Object.entries(incoming)) saved.days[k] = v;
+    for (const p of state.photos) if (saved.sel.has(photoKey(p))) (p.dupOf || p).selected = true;
+    for (const p of state.photos) if ((p.dupOf || p).selected) recordInfo(p);
+    flushSave(true);
+    rebuild(); openReport();
+    const nd = Object.keys(incoming).length;
+    $('#saveNote').textContent = `Restored from backup: ${nf.format(saved.sel.size - before)} new photo selections` + (nd ? ` and details for ${nf.format(nd)} ${nd === 1 ? 'day' : 'days'}.` : '.');
+  } catch (err) {
+    $('#saveNote').textContent = 'That file isn’t a backup from this tool. Choose a file named like volunteer-data-backup-….json.';
+  }
+});
+$('#forgetBtn').onclick = () => {
+  if (!confirm('Unselect every photo and erase the saved photo selections? Volunteer names, notes, adjustments and reviewed days are kept. Download a backup first if you might want the selections back.')) return;
+  saved.sel.clear(); saved.info.clear();
+  for (const p of state.photos) p.selected = false;
+  flushSave(true);
+  rebuild(); openReport();
+  $('#saveNote').textContent = 'Photo selections erased. Everything else was kept.';
+};
+
+/* ================= Hot reload =================
+   index.html loads this file and swaps in a new version when it changes on
+   disk. These hooks let it do that without losing the loaded photos. */
+shared.canReload = () => !state.reading
+  && !$('#viewer').open && !$('#report').open
+  && !(document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName) && !document.activeElement.readOnly);
+shared.teardown = () => {
+  flushSave(true);
+  life.abort();
+  if (io) io.disconnect();
+  queue.length = 0;
+  for (const t of [saveTimer, serverTimer, chipTimer, statTimer]) clearTimeout(t);
+  for (const p of state.photos) { hideThumb(p); p.tileEl = null; }
+};
+
+loadLocal();
+updateSaveStat();
+if (state.photos.length) {
+  // Hot reload: photos are already in memory, so go straight to the days
+  for (const p of state.photos) p.selected = false;
+  for (const p of state.photos) if (saved.sel.has(photoKey(p))) (p.dupOf || p).selected = true;
+  $('#intro').hidden = true; $('#bar').hidden = false;
+  rebuild();
+}
+showResume();
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+initServer();
+})();
+</script>
+</body>
+</html>
