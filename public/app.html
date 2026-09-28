@@ -29,6 +29,7 @@
   --field:#121A22; --tile:#222D39; color-scheme:dark;
 }
 *,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
 html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 140px)}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
 .wrap{max-width:1200px;margin:0 auto;padding:0 20px}
@@ -104,6 +105,17 @@ button,input,select{font:inherit;color:inherit}
 .gtitle h3{font-family:var(--display);font-size:18px;margin:0}
 .gtitle .range{color:var(--muted);font-size:14px}
 .digest .glabel{color:var(--muted);font-weight:700}
+.warnbtn{background:var(--mark-soft);border-color:var(--mark)}
+.cfnote{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 0;padding:8px 12px;border-radius:8px;background:var(--mark-soft);font-size:14px}
+#conflicts{max-width:min(1000px,96vw)}
+.cfday{border-top:1px solid var(--line);padding:16px 0 6px}
+.cfday h3{font-family:var(--display);font-size:19px;margin:0 0 10px}
+.cfcols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.cfcol{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px}
+.cfcol h4{margin:0 0 6px;font-size:13px;color:var(--muted)}
+.cfcol p{margin:2px 0}
+.cfgroup+.cfgroup{margin-top:8px}
+@media (max-width:760px){.cfcols{grid-template-columns:1fr}}
 .adj{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-start;margin:16px 0 4px}
 .adjtitle{flex:1 1 100%;margin:0;font-size:13px;font-weight:700;color:var(--muted)}
 .adj .field input.mins{width:6em;font-weight:700}
@@ -270,6 +282,7 @@ dialog::backdrop{background:rgba(8,12,18,.82)}
     <div class="actions">
       <button class="btn primary" id="copyAll" type="button" title="Copies every day shown with selected photos, in your volunteer tracking sheet’s column order, ready to paste">Copy all days</button>
       <button class="btn" id="openReport" type="button">Report</button>
+      <button class="btn warnbtn" id="conflictBtn" type="button" hidden></button>
       <button class="btn" id="addMore" type="button">Add photos</button>
       <button class="btn" id="clear" type="button">Clear</button>
     </div>
@@ -316,6 +329,19 @@ dialog::backdrop{background:rgba(8,12,18,.82)}
   <p class="note" id="note" hidden></p>
   <div id="days"></div>
 </main>
+
+<dialog id="conflicts" aria-labelledby="cfTitle">
+  <div class="rep">
+    <div class="rephead"><h2 id="cfTitle">Dates to review</h2><button class="btn small" type="button" id="cfClose">Close</button></div>
+    <p class="lead" id="cfLead"></p>
+    <div class="repactions" id="cfBulk">
+      <button class="btn" type="button" id="cfAllMine">Keep this computer’s for all</button>
+      <button class="btn" type="button" id="cfAllTheirs">Use the backup’s for all</button>
+      <button class="btn" type="button" id="cfAllCombine">Combine all where possible</button>
+    </div>
+    <div id="cfBody"></div>
+  </div>
+</dialog>
 
 <input type="file" id="folderInput" webkitdirectory multiple class="sr" tabindex="-1" aria-hidden="true">
 <input type="file" id="restoreInput" accept=".json,application/json" class="sr" tabindex="-1" aria-hidden="true">
@@ -622,7 +648,7 @@ async function readMeta(file) {
 const STORE_KEY = 'volunteer-photo-hours:v2';   // same key since v2; the data inside carries its version
 const OLD_KEY = 'volunteer-photo-hours:v1';
 const SERVER_FILE = 'data/volunteer-data.json';
-const saved = { sel: new Set(), info: new Map(), days: {}, ok: true, savedAt: '' };
+const saved = { sel: new Set(), info: new Map(), days: {}, conflicts: {}, ok: true, savedAt: '' };
 const server = { mode: 'off', ready: false };   // off | probing | on | failed
 const photoKey = p => `${p.name}|${p.file.size}`;
 state.round = 0;
@@ -713,7 +739,7 @@ function snapshot() {
   }
   return {
     app: 'volunteer-photo-hours', version: 4, savedAt: saved.savedAt || new Date().toISOString(),
-    selected: [...saved.sel], photoInfo, days,
+    selected: [...saved.sel], photoInfo, days, conflicts: cleanDays(saved.conflicts),
     settings: { format: state.format, order: state.order, round: state.round, onlySel: !!state.onlySel, from: $('#from').value, to: $('#to').value }
   };
 }
@@ -732,6 +758,7 @@ function applySnapshot(d) {
   if (d.photoInfo && typeof d.photoInfo === 'object')
     for (const [k, v] of Object.entries(d.photoInfo)) if (v && typeof v.t === 'string' && typeof v.p === 'string') saved.info.set(k, { t: v.t, p: v.p, ...(typeof v.c === 'string' ? { c: v.c } : {}) });
   saved.days = cleanDays(d.days);
+  saved.conflicts = cleanDays(d.conflicts);
   saved.savedAt = typeof d.savedAt === 'string' ? d.savedAt : '';
   applySettings(d.settings);
 }
@@ -804,7 +831,7 @@ function afterExternalLoad() {
   for (const p of state.photos) p.selected = false;
   for (const p of state.photos) if (saved.sel.has(photoKey(p))) (p.dupOf || p).selected = true;
   if (state.photos.length) rebuild();
-  showResume();
+  showResume(); refreshConflictUI();
 }
 function updateSaveStat() {
   const el = $('#saveStat');
@@ -1211,6 +1238,8 @@ function renderDay(day) {
   const E = day.els;
   E.meta = h('span', { class: 'meta' });
   E.digest = h('div', { class: 'digest' });
+  E.conflict = h('div', { class: 'cfnote', hidden: true }, 'A backup has a different version of this date’s details.',
+    h('button', { class: 'btn small', type: 'button', onclick: () => openConflicts(day.key) }, 'Review'));
 
   // Reviewed: same spot on every day, at the left of the header
   E.rev = h('button', { class: 'rev', type: 'button', 'aria-pressed': 'false', 'aria-label': `Reviewed, ${when}` },
@@ -1246,6 +1275,7 @@ function renderDay(day) {
 
   E.sec = h('section', { class: 'day', id: 'day-' + day.key, 'aria-label': when },
     h('div', { class: 'dayhead' }, E.rev, h('h2', {}, when), E.meta),
+    E.conflict,
     E.digest,
     h('div', { class: 'splitbar' }, E.addSplit, E.splitHint),
     E.tl,
@@ -1474,6 +1504,7 @@ function updateDay(day) {
   const selected = gs.reduce((n, g) => n + (g ? g.count : 0), 0);
   E.sec.classList.toggle('reviewed', reviewed);
   E.sec.classList.toggle('empty', !selected);
+  E.conflict.hidden = !saved.conflicts[day.key];
   E.rev.setAttribute('aria-pressed', String(reviewed));
   E.rev.title = reviewed ? 'Reviewed. Click to expand this day again.' : 'Mark this day reviewed and collapse it';
   E.meta.textContent = selected ? `${selected} of ${day.photos.length} photos selected` : (reviewed ? 'No volunteer photos' : `0 of ${day.photos.length} photos selected`);
@@ -1777,6 +1808,9 @@ function openReport() {
   $('#repNote').textContent = '';
   for (const id of ['#dlLog', '#copyLog', '#dlPeople', '#dlPhotos']) $(id).disabled = !days.length;
   const parts = [];
+  const pend = Object.keys(saved.conflicts).filter(k => (!$('#from').value || k >= $('#from').value) && (!$('#to').value || k <= $('#to').value));
+  if (pend.length) parts.push(h('p', { class: 'warn' }, `${pend.length} ${pend.length === 1 ? 'date has' : 'dates have'} a different version from a backup waiting for review, so this report uses this computer’s version: ${pend.sort().join(', ')}.`,
+    ' ', h('button', { class: 'btn small', type: 'button', onclick: () => openConflicts() }, 'Review')));
   if (days.missing) parts.push(h('p', { class: 'warn' }, `${nf.format(days.missing)} selected ${days.missing === 1 ? 'photo was' : 'photos were'} saved before photo times were recorded. Load ${days.missing === 1 ? 'it' : 'them'} once and ${days.missing === 1 ? 'it’s' : 'they’re'} included from then on.`));
   if (!days.length) {
     $('#repLead').textContent = '';
@@ -1902,7 +1936,9 @@ function showResume() {
   const el = $('#resume');
   const nd = Object.keys(cleanDays(saved.days)).length;
   el.hidden = (!saved.sel.size && !nd) || state.photos.length > 0;
-  el.textContent = `Saved from last time: ${nf.format(saved.sel.size)} selected ${saved.sel.size === 1 ? 'photo' : 'photos'} and details for ${nf.format(nd)} ${nd === 1 ? 'day' : 'days'}. Choose the same photos to pick up where you left off.`;
+  const nc = Object.keys(saved.conflicts).length;
+  el.textContent = `Saved from last time: ${nf.format(saved.sel.size)} selected ${saved.sel.size === 1 ? 'photo' : 'photos'} and details for ${nf.format(nd)} ${nd === 1 ? 'day' : 'days'}. Choose the same photos to pick up where you left off.` +
+    (nc ? ` ${nc} ${nc === 1 ? 'date from a backup needs' : 'dates from a backup need'} review once the photos are loaded.` : '');
 }
 
 for (const id of ['#from', '#to', '#format', '#order', '#round']) $(id).addEventListener('change', persist);
@@ -1926,13 +1962,16 @@ $('#restoreInput').addEventListener('change', async e => {
     if (d.photoInfo && typeof d.photoInfo === 'object')
       for (const [k, v] of Object.entries(d.photoInfo)) if (v && typeof v.t === 'string' && typeof v.p === 'string' && !saved.info.has(k)) saved.info.set(k, { t: v.t, p: v.p, ...(typeof v.c === 'string' ? { c: v.c } : {}) });
     const incoming = cleanDays(d.days);
-    for (const [k, v] of Object.entries(incoming)) saved.days[k] = v;
+    let added = 0, conflicts = 0;
+    for (const [k, v] of Object.entries(incoming)) { const r = mergeIncomingDay(k, v); if (r === 'added') added++; else if (r === 'conflict') conflicts++; }
     for (const p of state.photos) if (saved.sel.has(photoKey(p))) (p.dupOf || p).selected = true;
     for (const p of state.photos) if ((p.dupOf || p).selected) recordInfo(p);
     flushSave(true);
     rebuild(); openReport();
-    const nd = Object.keys(incoming).length;
-    $('#saveNote').textContent = `Restored from backup: ${nf.format(saved.sel.size - before)} new photo selections` + (nd ? ` and details for ${nf.format(nd)} ${nd === 1 ? 'day' : 'days'}.` : '.');
+    refreshConflictUI();
+    $('#saveNote').textContent = `Restored from backup: ${nf.format(saved.sel.size - before)} new photo selections and details for ${nf.format(added)} new ${added === 1 ? 'day' : 'days'}.` +
+      (conflicts ? ` ${conflicts} ${conflicts === 1 ? 'date was' : 'dates were'} saved differently here and in the backup. Nothing was replaced; review ${conflicts === 1 ? 'it' : 'them'} now or later.` : '');
+    if (conflicts) openConflicts();
   } catch (err) {
     $('#saveNote').textContent = 'That file isn’t a backup from this tool. Choose a file named like volunteer-data-backup-….json.';
   }
@@ -1946,11 +1985,122 @@ $('#forgetBtn').onclick = () => {
   $('#saveNote').textContent = 'Photo selections erased. Everything else was kept.';
 };
 
+/* ================= Backup conflicts =================
+   Restoring never replaces details you already have. A date saved differently
+   here and in the backup keeps this computer's version and holds the backup's
+   version in saved.conflicts until you choose. */
+const sameJSON = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const dayHasContent = d => !!d && (d.splits.length > 0 || d.groups.some(hasContent));
+const currentDay = k => cleanDays({ [k]: saved.days[k] })[k] || null;
+function mergeIncomingDay(k, inc) {          // 'added' | 'same' | 'conflict'
+  const cur = currentDay(k);
+  if (!dayHasContent(cur)) { saved.days[k] = { ...inc, reviewed: inc.reviewed || !!(cur && cur.reviewed) }; return dayHasContent(inc) ? 'added' : 'same'; }
+  if (!dayHasContent(inc) || sameJSON([cur.splits, cur.groups], [inc.splits, inc.groups])) {
+    saved.days[k].reviewed = cur.reviewed || inc.reviewed;
+    return 'same';
+  }
+  saved.conflicts[k] = inc;
+  return 'conflict';
+}
+function combineDays(a, b) {                 // null when the two split the day differently
+  if (!sameJSON(a.splits, b.splits)) return null;
+  const groups = a.groups.map((ga, i) => {
+    const gb = b.groups[i] || blankGroup();
+    const seen = new Set(ga.names.map(n => n.toLowerCase()));
+    const names = [...ga.names, ...gb.names.filter(n => !seen.has(n.toLowerCase()))];
+    const count = ga.count == null && gb.count == null ? null : Math.max(countOf(ga), countOf(gb), names.length);
+    const lines = [], ls = new Set();
+    for (const l of [...ga.notes.split('\n'), ...gb.notes.split('\n')]) { const t = l.trim(); if (t && !ls.has(t.toLowerCase())) { ls.add(t.toLowerCase()); lines.push(t); } }
+    const adjust = {};
+    for (const f of ['before', 'after', 'travel']) adjust[f] = ga.adjust[f] || gb.adjust[f];
+    return { names, count: count === names.length ? null : count, notes: lines.join('\n'), adjust };
+  });
+  return { reviewed: a.reviewed || b.reviewed, splits: a.splits.slice(), groups };
+}
+function resolveConflict(k, choice, quiet) {
+  const inc = saved.conflicts[k];
+  if (!inc) return false;
+  const cur = currentDay(k) || { reviewed: false, splits: [], groups: [blankGroup()] };
+  const result = choice === 'mine' ? cur : choice === 'theirs' ? inc : combineDays(cur, inc);
+  if (!result) return false;
+  saved.days[k] = result;
+  delete saved.conflicts[k];
+  const day = state.days.find(d => d.key === k);
+  if (day) rerenderDay(day);
+  if (!quiet) { flushSave(true); updateSummary(); refreshConflictUI(); renderConflicts(); }
+  return true;
+}
+function resolveAll(choice) {
+  let n = 0;
+  for (const k of Object.keys(saved.conflicts)) if (resolveConflict(k, choice, true)) n++;
+  flushSave(true); updateSummary(); refreshConflictUI(); renderConflicts();
+  return n;
+}
+function refreshConflictUI() {
+  const n = Object.keys(saved.conflicts).length, btn = $('#conflictBtn');
+  btn.hidden = !n;
+  btn.textContent = `${n} ${n === 1 ? 'date needs' : 'dates need'} review`;
+  for (const d of state.days) if (d.els.conflict) d.els.conflict.hidden = !saved.conflicts[d.key];
+}
+function versionSummary(d) {
+  if (!dayHasContent(d)) return [h('p', { class: 'hint' }, 'No details saved')];
+  const out = [];
+  if (d.splits.length) out.push(h('p', {}, h('strong', {}, 'Split at '), d.splits.map(secLabel).join(', ')));
+  d.groups.forEach((g, i) => {
+    const lines = [`Volunteers (${countOf(g)}): ${g.names.join(', ') || 'none named'}`];
+    const acts = g.notes.split('\n').map(x => x.trim()).filter(Boolean);
+    if (acts.length) lines.push(`Activities: ${acts.join('; ')}`);
+    const a = g.adjust, adj = [];
+    if (a.before) adj.push(`${hmSigned(a.before * 60000)} before`);
+    if (a.after) adj.push(`${hmSigned(a.after * 60000)} after`);
+    if (a.travel) adj.push(`${hmSigned(a.travel * 60000)} travel`);
+    if (adj.length) lines.push(`Adjustments: ${adj.join(', ')}`);
+    out.push(h('div', { class: 'cfgroup' }, d.groups.length > 1 ? h('strong', {}, `Group ${i + 1}`) : null, ...lines.map(t => h('p', {}, t))));
+  });
+  if (d.reviewed) out.push(h('p', { class: 'hint' }, 'Marked reviewed'));
+  return out;
+}
+function renderConflicts() {
+  const keys = Object.keys(saved.conflicts).sort();
+  $('#cfBulk').hidden = keys.length < 2;
+  if (!keys.length) {
+    $('#cfLead').textContent = 'All dates are resolved.';
+    $('#cfBody').replaceChildren(h('p', { class: 'empty' }, 'Nothing left to review. Your choices are saved.'));
+    return;
+  }
+  $('#cfLead').textContent = `${keys.length} ${keys.length === 1 ? 'date was' : 'dates were'} saved differently on this computer and in a backup. Nothing has been replaced. ` +
+    'Choose which version to keep for each date. Combine keeps everyone and every activity from both; where the time adjustments differ, this computer’s are kept.';
+  $('#cfBody').replaceChildren(...keys.map(k => {
+    const cur = currentDay(k), inc = saved.conflicts[k], comb = cur && combineDays(cur, inc);
+    const btn = (label, choice, primary) => h('button', { class: 'btn' + (primary ? ' primary' : ''), type: 'button', onclick: () => resolveConflict(k, choice) }, label);
+    return h('section', { class: 'cfday', id: 'cf-' + k },
+      h('h3', {}, longDate(new Date(k + 'T00:00'))),
+      h('div', { class: 'cfcols' },
+        h('div', { class: 'cfcol' }, h('h4', {}, 'On this computer'), ...versionSummary(cur)),
+        h('div', { class: 'cfcol' }, h('h4', {}, 'From the backup'), ...versionSummary(inc))),
+      h('div', { class: 'repactions' },
+        btn('Keep this computer’s', 'mine'), btn('Use the backup’s', 'theirs'),
+        comb ? btn('Combine both', 'combine', true) : h('span', { class: 'hint' }, 'Can’t combine: the two versions split the day at different times.')));
+  }));
+}
+function openConflicts(focusKey) {
+  renderConflicts();
+  const dlg = $('#conflicts');
+  if (!dlg.open) dlg.showModal();
+  if (focusKey) { const el = document.getElementById('cf-' + focusKey); if (el) el.scrollIntoView({ block: 'start' }); }
+}
+$('#conflictBtn').onclick = () => openConflicts();
+$('#cfClose').onclick = () => $('#conflicts').close();
+$('#conflicts').addEventListener('click', e => { if (e.target === $('#conflicts')) $('#conflicts').close(); });
+$('#cfAllMine').onclick = () => resolveAll('mine');
+$('#cfAllTheirs').onclick = () => resolveAll('theirs');
+$('#cfAllCombine').onclick = () => resolveAll('combine');
+
 /* ================= Hot reload =================
    index.html loads this file and swaps in a new version when it changes on
    disk. These hooks let it do that without losing the loaded photos. */
 shared.canReload = () => !state.reading && !splitDay
-  && !$('#viewer').open && !$('#report').open
+  && !$('#viewer').open && !$('#report').open && !$('#conflicts').open
   && !(document.activeElement && /^(TEXTAREA|INPUT|SELECT)$/.test(document.activeElement.tagName) && !document.activeElement.readOnly);
 shared.teardown = () => {
   flushSave(true);
@@ -1971,6 +2121,7 @@ if (state.photos.length) {
   rebuild();
 }
 showResume();
+refreshConflictUI();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 initServer();
 })();
