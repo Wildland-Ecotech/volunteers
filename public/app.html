@@ -728,6 +728,19 @@ function recordInfo(p) {
   if (main) rec.c = photoKey(main);
   saved.info.set(photoKey(p), rec);
 }
+// Make sure every loaded, selected photo has its time and path in the saved data.
+// Photos loaded before times were recorded (and kept through hot reloads) get them here.
+function syncInfo() {
+  let changed = 0;
+  for (const p of state.photos) {
+    if (!(p.dupOf || p).selected) continue;
+    const k = photoKey(p), i = saved.info.get(k), c = p.dupOf ? photoKey(p.dupOf) : undefined;
+    if (!saved.sel.has(k)) { saved.sel.add(k); changed++; }
+    if (!i || i.t !== isoLocal(p.date) || i.p !== p.path || i.c !== c) { recordInfo(p); changed++; }
+  }
+  if (changed) persist();
+  return changed;
+}
 // Selected photos grouped by day, from saved data (works without photos loaded)
 function savedPhotoDays() {
   const days = new Map(), copies = new Map();
@@ -1228,6 +1241,7 @@ const ghostCount = () => state.days.reduce((n, d) => n + d.ghosts.length, 0);
 function showData() {
   const any = state.photos.length > 0 || hasSavedData();
   $('#intro').hidden = any; $('#bar').hidden = !any;
+  syncInfo();
   if (any) rebuild(); else $('#days').replaceChildren();
   showResume();
   if (any && !state.photos.length) showNote('Showing your saved data. Dashed tiles are selected photos that aren’t loaded. Use Add photos to load them.');
@@ -1830,23 +1844,28 @@ $('#onlySel').onclick = e => {
    Built from the saved data, so it covers every day you've worked on,
    whether or not those photos are loaded right now. */
 function reportDays() {
+  syncInfo();
   const from = $('#from').value, to = $('#to').value;
-  const { days, copies, missing } = savedPhotoDays();
+  const copiesOf = new Map();
+  for (const [k, i] of saved.info) if (i.c) { const a = copiesOf.get(i.c); if (a) a.push(i.p); else copiesOf.set(i.c, [i.p]); }
   const out = [];
-  for (const [key, photos] of [...days.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    if ((from && key < from) || (to && key > to)) continue;
-    for (const ph of photos) ph.copies = copies.get(ph.key) || [];
-    const parts = splitList(photos, splitsOf(key));
-    const used = parts.filter(x => x.length).length;
-    parts.forEach((list, gi) => {
-      if (!list.length) return;
-      const s = list[0].t, e = list[list.length - 1].t;
-      const st = { s, e, rs: roundTime(s), re: roundTime(e) };
-      const T = dayTotals(key, gi, st.rs, st.re), n = volCount(key, gi);
-      out.push({ key, gi, multi: used > 1, photos: list, st, T, ms: T.ms, n, vh: volHours(T.ms, n), info: groupInfo(key, gi) });
+  const days = [...collectDays().values()].filter(d => (!from || d.key >= from) && (!to || d.key <= to)).sort((a, b) => a.key.localeCompare(b.key));
+  for (const day of days) {
+    const gs = groupStats(day);                       // the same numbers the day card shows
+    const used = gs.filter(Boolean).length;
+    if (!used) continue;
+    const items = [
+      ...day.photos.filter(p => p.selected).map(p => ({ key: photoKey(p), t: p.date, path: p.path, copies: (p.copies || []).map(c => c.path) })),
+      ...day.ghosts.map(g => ({ key: g.key, t: g.t, path: g.path, copies: copiesOf.get(g.key) || [] }))
+    ].sort((a, b) => a.t - b.t);
+    const parts = splitList(items, splitsOf(day.key));
+    gs.forEach((st, gi) => {
+      if (!st) return;
+      const T = dayTotals(day.key, gi, st.rs, st.re), n = volCount(day.key, gi);
+      out.push({ key: day.key, gi, multi: used > 1, photos: parts[gi], st, T, ms: T.ms, n, vh: volHours(T.ms, n), info: groupInfo(day.key, gi) });
     });
   }
-  out.missing = missing;
+  out.missing = [...saved.sel].filter(k => !saved.info.has(k)).length;
   return out;
 }
 const rowLabel = d => d.multi ? `${d.key} (group ${d.gi + 1})` : d.key;
