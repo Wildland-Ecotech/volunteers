@@ -106,6 +106,23 @@ button,input,select{font:inherit;color:inherit}
 .gtitle .range{color:var(--muted);font-size:14px}
 .digest .glabel{color:var(--muted);font-weight:700}
 .warnbtn{background:var(--mark-soft);border-color:var(--mark)}
+/* Ghost tiles: selected photos whose files aren't loaded */
+.tile.ghost{background:transparent;border:2px dashed var(--muted)}
+.tile.ghost.on::after{display:none}
+.gpick{all:unset;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:3px;width:100%;height:100%;padding:24px 8px 26px;cursor:copy;text-align:center}
+.gpick:focus-visible{outline:3px solid var(--mark);outline-offset:-3px}
+.gbadge{position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.gname{font-weight:700;font-size:12px;word-break:break-all}
+.gfolder{font-size:11px;color:var(--muted);word-break:break-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tile.ghost .ttime{background:none;color:var(--muted)}
+.tile.ghost.copied .gbadge{color:var(--accent)}
+.gx{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:50%;border:0;background:var(--line);color:var(--ink);font:700 14px/1 var(--body);cursor:pointer}
+.gx:focus-visible{outline:3px solid var(--mark);outline-offset:1px}
+.day.reviewed .tile.ghost .gfolder,.day.reviewed .tile.ghost .gx,.day.reviewed .tile.ghost .gbadge{display:none}
+.day.reviewed .gpick{padding:6px 4px 20px}
+.tl .tick.ghost{background:repeating-linear-gradient(var(--accent) 0 3px,transparent 3px 6px)}
+.cfnote.missing{background:var(--field);border:1px dashed var(--muted)}
+.gnote{grid-column:1/-1;margin:0;color:var(--muted);font-size:14px}
 .cfnote{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 0;padding:8px 12px;border-radius:8px;background:var(--mark-soft);font-size:14px}
 #conflicts{max-width:min(1000px,96vw)}
 .cfday{border-top:1px solid var(--line);padding:16px 0 6px}
@@ -830,8 +847,7 @@ async function writeServer(leaving) {
 function afterExternalLoad() {
   for (const p of state.photos) p.selected = false;
   for (const p of state.photos) if (saved.sel.has(photoKey(p))) (p.dupOf || p).selected = true;
-  if (state.photos.length) rebuild();
-  showResume(); refreshConflictUI();
+  showData(); refreshConflictUI();
 }
 function updateSaveStat() {
   const el = $('#saveStat');
@@ -1130,11 +1146,13 @@ function roundTime(d) {
 function groupStats(day, splits) {
   splits = splits || splitsOf(day.key);
   const out = Array.from({ length: splits.length + 1 }, () => null);
-  for (const p of day.photos) if (p.selected) {
-    const gi = groupIndex(splits, p.date);
-    const g = out[gi] || (out[gi] = { s: p.date, e: p.date, count: 0 });
-    g.e = p.date; g.count++;
-  }
+  const add = t => {
+    const gi = groupIndex(splits, t), g = out[gi];
+    if (!g) out[gi] = { s: t, e: t, count: 1 };
+    else { if (t < g.s) g.s = t; if (t > g.e) g.e = t; g.count++; }
+  };
+  for (const p of day.photos) if (p.selected) add(p.date);
+  for (const g of day.ghosts || []) add(g.t);      // selected photos that aren't loaded
   for (const g of out) if (g) { g.rs = roundTime(g.s); g.re = roundTime(g.e); }
   return out;
 }
@@ -1180,35 +1198,57 @@ const dayRows = day => groupStats(day).map((st, gi) => st ? logRow(day.key, gi, 
 const tsvCell = v => { const t = String(v); return /[\t\n\r"]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
 const toTSV = rows => rows.map(r => r.map(tsvCell).join('\t')).join('\n');
 
+/* Days to show: dates with loaded photos, dates with selected photos saved
+   (loaded or not), and dates with saved details. Selected photos whose files
+   aren't loaded become ghosts, placed from the saved time and path. */
+function collectDays() {
+  const map = new Map();
+  const get = k => { let d = map.get(k); if (!d) map.set(k, d = { key: k, photos: [], ghosts: [], els: {} }); return d; };
+  const loadedKeys = new Set();
+  for (const p of state.photos) { loadedKeys.add(photoKey(p)); if (!p.dupOf) get(dISO(p.date)).photos.push(p); }
+  // a loaded copy of a saved photo (same size, same time) covers it, even if renamed
+  const loadedSig = new Set(state.photos.map(p => `${p.file.size}|${isoLocal(p.date)}`));
+  const copiesOf = new Map();
+  for (const [k, i] of saved.info) if (i.c) { const a = copiesOf.get(i.c); if (a) a.push(k); else copiesOf.set(i.c, [k]); }
+  for (const k of saved.sel) {
+    const i = saved.info.get(k);
+    if (!i || i.c || loadedKeys.has(k)) continue;
+    if ((copiesOf.get(k) || []).some(c => loadedKeys.has(c))) continue;
+    if (loadedSig.has(`${k.slice(k.lastIndexOf('|') + 1)}|${i.t}`)) continue;
+    get(i.t.slice(0, 10)).ghosts.push({ key: k, t: new Date(i.t), path: i.p });
+  }
+  for (const k of Object.keys(saved.days)) if (dayHasContent(currentDay(k))) get(k);
+  for (const d of map.values()) { d.photos.sort((a, b) => a.date - b.date); d.ghosts.sort((a, b) => a.t - b.t); }
+  return map;
+}
+const hasSavedData = () => saved.sel.size > 0 || Object.keys(cleanDays(saved.days)).length > 0;
+const ghostCount = () => state.days.reduce((n, d) => n + d.ghosts.length, 0);
+
+// Show the days, or the start screen when there's nothing loaded or saved
+function showData() {
+  const any = state.photos.length > 0 || hasSavedData();
+  $('#intro').hidden = any; $('#bar').hidden = !any;
+  if (any) rebuild(); else $('#days').replaceChildren();
+  showResume();
+  if (any && !state.photos.length) showNote('Showing your saved data. Dashed tiles are selected photos that aren’t loaded. Use Add photos to load them.');
+}
+
 function rebuild() {
   for (const p of state.photos) { hideThumb(p); p.tileEl = null; }
   queue.length = 0;
   const from = $('#from').value, to = $('#to').value;
-  const groups = new Map();
-  for (const p of state.photos) {
-    if (p.dupOf) continue;
-    const key = dISO(p.date);
-    if ((from && key < from) || (to && key > to)) continue;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(p);
-  }
-  let entries = [...groups.entries()];
-  if (state.onlySel) entries = entries.filter(([, ph]) => ph.some(p => p.selected));
-  state.days = entries
-    .sort((a, b) => state.order === 'asc' ? a[0].localeCompare(b[0]) : b[0].localeCompare(a[0]))
-    .map(([key, photos]) => ({ key, photos: photos.sort((a, b) => a.date - b.date), els: {} }));
-
-  if (state.photos.length) {
-    let min = '9999', max = '0000';
-    for (const p of state.photos) { const k = dISO(p.date); if (k < min) min = k; if (k > max) max = k; }
-    for (const id of ['#from', '#to']) { $(id).min = min; $(id).max = max; }
-  }
+  const all = collectDays();
+  const keys = [...all.keys()].sort();
+  if (keys.length) for (const id of ['#from', '#to']) { $(id).min = keys[0]; $(id).max = keys[keys.length - 1]; }
+  let days = [...all.values()].filter(d => (!from || d.key >= from) && (!to || d.key <= to));
+  if (state.onlySel) days = days.filter(d => d.ghosts.length || d.photos.some(p => p.selected) || dayHasContent(currentDay(d.key)));
+  state.days = days.sort((a, b) => state.order === 'asc' ? a.key.localeCompare(b.key) : b.key.localeCompare(a.key));
 
   makeObserver();
   const box = $('#days');
   box.replaceChildren();
   const frag = document.createDocumentFragment();
-  if (!state.days.length && state.photos.length) frag.append(h('p', { class: 'empty-filter' }, state.onlySel
+  if (!state.days.length && all.size) frag.append(h('p', { class: 'empty-filter' }, state.onlySel
     ? 'No days with selected photos in this date range. Turn off “Only days with selections” to see every day and pick photos.'
     : 'No photos in this date range. Widen the From and To dates to see more days.'));
   for (const day of state.days) frag.append(renderDay(day));
@@ -1232,8 +1272,7 @@ function copyBtn(getText, label) {
 }
 
 function renderDay(day) {
-  const first = day.photos[0].date;
-  const when = longDate(first);
+  const when = longDate(new Date(day.key + 'T00:00'));
   const uid = 'd' + day.key.replace(/-/g, '');
   const E = day.els;
   E.meta = h('span', { class: 'meta' });
@@ -1264,18 +1303,30 @@ function renderDay(day) {
 
   // Photo grid with a divider at each split
   const grid = h('div', { class: 'grid' });
+  const items = [...day.photos.map(p => ({ t: p.date, p })), ...day.ghosts.map(g => ({ t: g.t, g }))].sort((a, b) => a.t - b.t);
   let cur = 0;
-  for (const p of day.photos) {
-    const gi = groupIndex(splits, p.date);
+  for (const it of items) {
+    const gi = groupIndex(splits, it.t);
     while (cur < gi) { grid.append(h('div', { class: 'gdiv' }, `Split at ${secLabel(splits[cur])}`)); cur++; }
-    grid.append(makeTile(p, day));
+    grid.append(it.p ? makeTile(it.p, day) : makeGhost(it.g, day));
   }
-  const setAll = v => { day.photos.forEach(p => setSel(p, v)); updateDay(day); updateSummary(); };
+  if (!items.length) grid.append(h('p', { class: 'gnote' }, 'No photos selected or loaded for this date. The details below are saved.'));
+
+  // Where the missing photos are expected
+  E.missing = h('div', { class: 'cfnote missing', hidden: true });
+  if (day.ghosts.length) {
+    const folders = [...new Set(day.ghosts.map(g => folderOf(g.path) || '(top folder)'))];
+    E.missing.hidden = false;
+    E.missing.textContent = `${day.ghosts.length} selected ${day.ghosts.length === 1 ? 'photo isn’t' : 'photos aren’t'} loaded. Expected in: ` +
+      folders.slice(0, 3).join(', ') + (folders.length > 3 ? `, and ${folders.length - 3} more ${folders.length - 3 === 1 ? 'folder' : 'folders'}` : '') + '.';
+  }
+  const setAll = v => { day.photos.forEach(p => setSel(p, v)); updateDay(day); updateSummary(); };   // loaded photos only
   E.copyRows = copyBtn(() => toTSV(dayRows(day)), 'Copy row for spreadsheet');
 
   E.sec = h('section', { class: 'day', id: 'day-' + day.key, 'aria-label': when },
     h('div', { class: 'dayhead' }, E.rev, h('h2', {}, when), E.meta),
     E.conflict,
+    E.missing,
     E.digest,
     h('div', { class: 'splitbar' }, E.addSplit, E.splitHint),
     E.tl,
@@ -1503,11 +1554,13 @@ function updateDay(day) {
   const E = day.els, gs = groupStats(day), info = dayInfo(day.key), reviewed = !!(info && info.reviewed);
   const selected = gs.reduce((n, g) => n + (g ? g.count : 0), 0);
   E.sec.classList.toggle('reviewed', reviewed);
-  E.sec.classList.toggle('empty', !selected);
+  E.sec.classList.toggle('empty', !selected && !dayHasContent(currentDay(day.key)));
   E.conflict.hidden = !saved.conflicts[day.key];
   E.rev.setAttribute('aria-pressed', String(reviewed));
   E.rev.title = reviewed ? 'Reviewed. Click to expand this day again.' : 'Mark this day reviewed and collapse it';
-  E.meta.textContent = selected ? `${selected} of ${day.photos.length} photos selected` : (reviewed ? 'No volunteer photos' : `0 of ${day.photos.length} photos selected`);
+  const loadedSel = day.photos.filter(p => p.selected).length, gh = day.ghosts.length;
+  E.meta.textContent = !selected && reviewed ? 'No volunteer photos'
+    : (day.photos.length ? `${loadedSel} of ${day.photos.length} loaded photos selected` : 'No photos loaded') + (gh ? `, ${gh} selected not loaded` : '');
   E.copyRows.textContent = E.copyRows._label = gs.filter(Boolean).length > 1 ? 'Copy rows for spreadsheet' : 'Copy row for spreadsheet';
   gs.forEach((st, gi) => updateGroup(day, gi, st));
   if (!reviewed) drawTimeline(day);
@@ -1540,7 +1593,12 @@ function fillDigest(day, gs, reviewed) {
 function drawTimeline(day) {
   const E = day.els, tl = E.tl;
   const hr = d => d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-  let lo = Math.floor(hr(day.photos[0].date)), hi = Math.ceil(hr(day.photos[day.photos.length - 1].date) + 0.001);
+  const times = [...day.photos.map(p => p.date), ...day.ghosts.map(g => g.t)];
+  let lo = 8, hi = 17;
+  if (times.length) {
+    lo = Math.floor(Math.min(...times.map(hr)));
+    hi = Math.ceil(Math.max(...times.map(hr)) + 0.001);
+  }
   for (const sp of splitsOf(day.key)) { lo = Math.min(lo, Math.floor(sp / 3600)); hi = Math.max(hi, Math.ceil(sp / 3600)); }
   while (hi - lo < 4) { if (lo > 0) lo--; if (hi - lo < 4 && hi < 24) hi++; }
   day.scale = { lo, hi };
@@ -1548,6 +1606,7 @@ function drawTimeline(day) {
   const frag = document.createDocumentFragment();
   frag.append(h('div', { class: 'axis' }));
   for (const p of day.photos) frag.append(h('div', { class: 'tick' + (p.selected ? '' : ' off'), style: `left:${pos(hr(p.date))}%` }));
+  for (const g of day.ghosts) frag.append(h('div', { class: 'tick ghost', style: `left:${pos(hr(g.t))}%` }));
   const step = span <= 8 ? 1 : span <= 14 ? 2 : 3;
   for (let x = lo; x <= hi; x += step) {
     const cls = 'hr' + (x === lo ? ' first' : '') + (x + step > hi && x !== lo ? ' last' : '');
@@ -1567,7 +1626,7 @@ function drawOverlay(day) {
   const frag = document.createDocumentFragment();
 
   if (day.mode === 'add') {            // shade long stretches with no selected photos
-    const sel = day.photos.filter(p => p.selected).map(p => secOfDay(p.date));
+    const sel = [...day.photos.filter(p => p.selected).map(p => p.date), ...day.ghosts.map(g => g.t)].map(secOfDay).sort((a, b) => a - b);
     for (let i = 1; i < sel.length; i++) if (sel[i] - sel[i - 1] >= 30 * 60)
       frag.append(h('div', { class: 'gap', style: `left:${pos(sel[i - 1])}%;width:${pos(sel[i]) - pos(sel[i - 1])}%` }));
   }
@@ -1593,6 +1652,34 @@ function drawOverlay(day) {
   if (day.mode === 'add' && day.hover != null)
     frag.append(h('div', { class: 'guide', style: `left:${pos(day.hover)}%` }, h('span', {}, secLabel(day.hover))));
   E.over.replaceChildren(frag);
+}
+
+// A selected photo that isn't loaded: click copies its expected path, × unselects it
+function makeGhost(g, day) {
+  const name = baseName(g.path), folder = folderOf(g.path);
+  const pick = h('button', {
+      class: 'gpick', type: 'button', title: `Not loaded. Expected at:\n${g.path}\nClick to copy the path.`,
+      'aria-label': `${name}, ${t12(g.t)}, selected but not loaded. Copy its path.`
+    },
+    h('span', { class: 'gbadge' }, 'Not loaded'), h('span', { class: 'gname' }, name),
+    folder ? h('span', { class: 'gfolder' }, folder) : null, h('span', { class: 'ttime' }, t12(g.t)));
+  const tile = h('div', { class: 'tile ghost on' }, pick);
+  pick.addEventListener('click', () => {
+    copyText(g.path, h('span'));
+    const badge = pick.querySelector('.gbadge');
+    tile.classList.add('copied'); badge.textContent = 'Path copied';
+    setTimeout(() => { tile.classList.remove('copied'); badge.textContent = 'Not loaded'; }, 1400);
+  });
+  tile.append(h('button', {
+    class: 'gx', type: 'button', title: 'Unselect this photo', 'aria-label': `Unselect ${name}`,
+    onclick: () => {
+      saved.sel.delete(g.key); saved.info.delete(g.key);
+      for (const [k, i] of saved.info) if (i.c === g.key) { saved.sel.delete(k); saved.info.delete(k); }
+      day.ghosts = day.ghosts.filter(x => x.key !== g.key);
+      persist(); rerenderDay(day); updateSummary();
+    }
+  }, '×'));
+  return tile;
 }
 
 const tpl = $('#tileTpl').content.firstElementChild;
@@ -1646,8 +1733,10 @@ function updateSummary() {
     if ((dayInfo(d.key) || {}).reviewed) reviewed++;
   }
   $('#sumMain').textContent = `${numStr(vh)} volunteer hours across ${withHours} ${withHours === 1 ? 'day' : 'days'}`;
-  $('#sumSub').textContent = `${numStr(total / 3600000)} hours on site. Reviewed ${nf.format(reviewed)} of ${nf.format(state.days.length)} days shown, ${nf.format(shown)} photos` +
-    (shown < uniquePhotos().length ? ` (${nf.format(uniquePhotos().length)} loaded)` : '') +
+  const gh = ghostCount();
+  $('#sumSub').textContent = `${numStr(total / 3600000)} hours on site, from all saved data in the date range. Reviewed ${nf.format(reviewed)} of ${nf.format(state.days.length)} days shown. ` +
+    `${nf.format(shown)} photos loaded` + (gh ? `, ${nf.format(gh)} selected photos not loaded` : '') +
+    (shown < uniquePhotos().length ? ` (${nf.format(uniquePhotos().length)} in total)` : '') +
     (dupCount() ? `, ${nf.format(dupCount())} duplicate ${dupCount() === 1 ? 'copy' : 'copies'} grouped` : '');
   const c = { camera: 0, name: 0, file: 0 };
   for (const p of state.photos) if (!p.dupOf) c[p.source]++;
@@ -1655,7 +1744,7 @@ function updateSummary() {
   if (c.camera) parts.push(`${nf.format(c.camera)} from camera info`);
   if (c.name) parts.push(`${nf.format(c.name)} from file names`);
   if (c.file) parts.push(`${nf.format(c.file)} from file modified times`);
-  $('#sumSrc').textContent = 'Dates: ' + parts.join(', ');
+  $('#sumSrc').textContent = parts.length ? 'Dates: ' + parts.join(', ') : '';
 }
 
 /* ================= Clipboard ================= */
@@ -1912,14 +2001,13 @@ $('#copyAll').onclick = e => {
   copyText(toTSV(rows), e.currentTarget);
 };
 $('#clear').onclick = () => {
-  if (!confirm('Remove all loaded photos from this page? Your files are not touched, and your saved selections and volunteer details are kept.')) return;
+  if (!confirm('Remove all loaded photos from this page? Your files are not touched. Your saved selections and details are kept and still shown.')) return;
   for (const p of state.photos) hideThumb(p);
   if (io) io.disconnect();
   queue.length = 0; cache.clear();
   state.photos.length = 0; state.seen.clear(); state.days = [];
   $('#days').replaceChildren(); $('#from').value = $('#to').value = '';
-  $('#bar').hidden = true; $('#intro').hidden = false; showNote('');
-  persist(); showResume();
+  showNote(''); persist(); showData();
 };
 
 /* ================= Saved progress ================= */
@@ -2113,14 +2201,10 @@ shared.teardown = () => {
 
 loadLocal();
 updateSaveStat();
-if (state.photos.length) {
-  // Hot reload: photos are already in memory, so go straight to the days
-  for (const p of state.photos) p.selected = false;
-  for (const p of state.photos) if (saved.sel.has(photoKey(p))) (p.dupOf || p).selected = true;
-  $('#intro').hidden = true; $('#bar').hidden = false;
-  rebuild();
-}
-showResume();
+// Hot reload keeps loaded photos in memory; saved data shows even with none loaded
+for (const p of state.photos) p.selected = false;
+for (const p of state.photos) if (saved.sel.has(photoKey(p))) (p.dupOf || p).selected = true;
+showData();
 refreshConflictUI();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 initServer();
